@@ -7,6 +7,9 @@ const config = {
   port: process.env.PORT ? parseInt(process.env.PORT, 10) : 5000,
   env: process.env.NODE_ENV,
   jwtSecret: process.env.JWT_SECRET as string,
+  mongoose: {
+    url: process.env.DATABASE_URL!,
+  },
 };
 
 export default config;

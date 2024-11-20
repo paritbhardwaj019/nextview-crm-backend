@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { IInventoryItem, PaginateModel } from "../types";
+import { IInventoryItem, InventoryStatus, PaginateModel } from "../types";
 import { paginate } from "../plugins/paginate.plugin";
 
 const inventoryItemSchema = new mongoose.Schema<IInventoryItem>(
@@ -22,8 +22,8 @@ const inventoryItemSchema = new mongoose.Schema<IInventoryItem>(
     status: {
       type: String,
       required: true,
-      default: "AVAILABLE",
-      enum: ["AVAILABLE", "OUT_OF_STOCK", "LOW_STOCK", "RESERVED"],
+      enum: Object.values(InventoryStatus),
+      default: InventoryStatus.AVAILABLE,
     },
   },
   {

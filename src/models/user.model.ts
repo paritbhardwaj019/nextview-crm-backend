@@ -21,7 +21,6 @@ const userSchema = new mongoose.Schema<IUserDocument>(
     },
     password: {
       type: String,
-      unique: true,
       trim: true,
     },
     contact: {
@@ -37,6 +36,11 @@ const userSchema = new mongoose.Schema<IUserDocument>(
     lastLogin: {
       type: Date,
       default: null,
+    },
+    role: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Role",
+      required: true,
     },
   },
   {
@@ -58,7 +62,7 @@ userSchema.methods.comparePassword = async function (
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-export const User = mongoose.model<IUserDocument, PaginateModel<IUser>>(
+export const User = mongoose.model<IUserDocument, PaginateModel<IUserDocument>>(
   "User",
   userSchema
 );

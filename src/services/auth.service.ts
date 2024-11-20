@@ -2,6 +2,7 @@ import { User } from "../models/user.model";
 import ApiError from "../utils/ApiError";
 import httpStatus from "../config/httpStatus";
 import jwt from "jsonwebtoken";
+import config from "../config/config";
 
 class AuthService {
   /**
@@ -54,7 +55,7 @@ class AuthService {
    */
 
   private generateToken(id: string): string {
-    return jwt.sign({ id }, process.env.JWT_SECRET!, {
+    return jwt.sign({ id }, config.jwtSecret, {
       expiresIn: "1h",
     });
   }

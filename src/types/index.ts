@@ -111,12 +111,27 @@ export interface IInventoryType extends Document {
   updatedAt?: Date;
 }
 
+export enum InventoryStatus {
+  AVAILABLE = "available",
+  RESERVED = "reserved",
+  IN_REPAIR = "in_repair",
+  DAMAGED = "damaged",
+}
+
 export interface IInventoryItem extends Document {
   id?: string;
   name: string;
   type: Types.ObjectId | IInventoryType;
   quantity: number;
-  status: string;
+  status: InventoryStatus;
+  location?: string;
+  serialNumber?: string;
+  warrantyExpiry?: Date;
+  lastMaintenanceDate?: Date;
+  reorderPoint?: number;
+  maxQuantity?: number;
+  unitCost?: number;
+  supplier?: string;
 
   createdAt?: Date;
   updatedAt?: Date;
@@ -170,4 +185,53 @@ export interface ICourierTracking extends Document {
 export interface AppError extends Error {
   statusCode: number;
   status: string;
+}
+
+export interface IInventoryMovement extends Document {
+  id?: string;
+  inventoryItem: Types.ObjectId | IInventoryItem;
+  type: "dispatch" | "return";
+  quantity: number;
+  reference: Types.ObjectId | ITicket | IInstallationRequest;
+  status: "pending" | "completed" | "cancelled";
+  notes?: string;
+  createdBy: Types.ObjectId | IUser;
+
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface InventoryReport {
+  stockLevels: {
+    itemId: string;
+    name: string;
+    currentQuantity: number;
+    reorderPoint: number;
+    status: string;
+  }[];
+  partsUsage: {
+    itemId: string;
+    name: string;
+    quantityUsed: number;
+    period: string;
+  }[];
+  returnRates: {
+    itemId: string;
+    name: string;
+    dispatchedQuantity: number;
+    returnedQuantity: number;
+    returnRate: number;
+  }[];
+}
+
+export interface INotification extends Document {
+  id?: string;
+  type: "inventory_low" | "part_dispatch" | "part_return" | "maintenance_due";
+  message: string;
+  status: "unread" | "read";
+  recipient: Types.ObjectId | IUser;
+  reference?: Types.ObjectId | IInventoryItem | ITicket;
+
+  createdAt?: Date;
+  updatedAt?: Date;
 }
