@@ -5,26 +5,24 @@ import courierTrackingRoutes from "./courierTracking.route";
 import installationRequestRoutes from "./installationRequest.route";
 import inventoryItemRoutes from "./inventoryItem.route";
 import inventoryTypeRoutes from "./inventoryType.route";
+import permissionRoutes from "./permission.route";
+import userRoutes from "./user.route";
+import inventoryMovementRoutes from "./inventoryMovement.route";
+import ticketRoutes from "./ticket.route";
+import customerRoutes from "./customer.route";
 
 const router = express.Router();
 
-/**
- * @route /roles
- * @desc Routes for role-related operations
- * @access Protected
- */
 router.use("/roles", roleRoutes);
-
-/**
- * @route /auth
- * @desc Routes for authentication operations
- * @access Public
- */
+router.use("/permissions", permissionRoutes);
+router.use("/users", userRoutes);
 router.use("/auth", authRoutes);
-
 router.use("/courier-trackings", courierTrackingRoutes);
 router.use("/installation-requests", installationRequestRoutes);
 router.use("/inventory-items", inventoryItemRoutes);
 router.use("/inventory-types", inventoryTypeRoutes);
+router.use("/inventory-movements", inventoryMovementRoutes);
+router.use("/tickets", ticketRoutes);
+router.use("/customers", customerRoutes);
 
 export default router;

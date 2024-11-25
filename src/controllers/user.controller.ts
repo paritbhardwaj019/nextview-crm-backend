@@ -75,6 +75,19 @@ class UserController {
       res.status(httpStatus.NO_CONTENT).send();
     }
   );
+
+  /**
+   * Handle retrieving user options for dropdowns or selections.
+   * @param req - Express request object.
+   * @param res - Express response object.
+   * @param next - Express next middleware function.
+   */
+  getUsersOptionsHandler = catchAsync(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const options = await UserService.getUserOptions();
+      res.status(httpStatus.OK).json(options);
+    }
+  );
 }
 
 export default new UserController();

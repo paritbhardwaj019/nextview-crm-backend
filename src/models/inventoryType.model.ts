@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { IInventoryType, PaginateModel } from "../types";
+import { paginate } from "../plugins/paginate.plugin";
 
 const inventoryTypeSchema = new mongoose.Schema<IInventoryType>(
   {
@@ -26,8 +27,12 @@ const inventoryTypeSchema = new mongoose.Schema<IInventoryType>(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+inventoryTypeSchema.plugin(paginate);
 
 export const InventoryType = mongoose.model<
   IInventoryType,

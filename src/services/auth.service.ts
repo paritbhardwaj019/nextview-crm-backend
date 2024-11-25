@@ -56,7 +56,7 @@ class AuthService {
 
   private generateToken(id: string): string {
     return jwt.sign({ id }, config.jwtSecret, {
-      expiresIn: "1h",
+      expiresIn: "3d",
     });
   }
 }

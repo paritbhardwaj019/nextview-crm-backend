@@ -1,5 +1,9 @@
 import roleController from "../../controllers/role.controller";
 import express from "express";
+import { checkJWT } from "../../middlewares/checkJWT";
+import { RESOURCES } from "../../config/resources";
+import { ACTIONS } from "../../config/actions";
+import { checkPermission } from "../../middlewares/checkPermission";
 
 const router = express.Router();
 
@@ -11,8 +15,16 @@ const router = express.Router();
  */
 router
   .route("/")
-  .get(roleController.queryRolesHandler)
-  .post(roleController.createRoleHandler);
+  .get(
+    checkJWT,
+    checkPermission(RESOURCES.ROLES, ACTIONS.VIEW),
+    roleController.queryRolesHandler
+  )
+  .post(
+    checkJWT,
+    checkPermission(RESOURCES.ROLES, ACTIONS.CREATE),
+    roleController.createRoleHandler
+  );
 
 /**
  * @route PUT /roles/:id
@@ -24,8 +36,20 @@ router
  */
 router
   .route("/:id")
-  .put(roleController.updateRoleHandler)
-  .get(roleController.getRoleByIdHandler)
-  .delete(roleController.deleteRoleHandler);
+  .put(
+    checkJWT,
+    checkPermission(RESOURCES.ROLES, ACTIONS.EDIT),
+    roleController.updateRoleHandler
+  )
+  .get(
+    checkJWT,
+    checkPermission(RESOURCES.ROLES, ACTIONS.VIEW),
+    roleController.getRoleByIdHandler
+  )
+  .delete(
+    checkJWT,
+    checkPermission(RESOURCES.ROLES, ACTIONS.DELETE),
+    roleController.deleteRoleHandler
+  );
 
 export default router;

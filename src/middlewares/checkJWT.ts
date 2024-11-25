@@ -26,17 +26,22 @@ export const checkJWT = async (
     const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
-      throw new ApiError(httpStatus.UNAUTHORIZED, "No token provided");
+      return next(new ApiError(httpStatus.UNAUTHORIZED, "No token provided"));
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
     const user = await User.findById(decoded.id);
 
-    if (!user) throw new ApiError(httpStatus.UNAUTHORIZED, "User not found");
+    if (!user) {
+      return next(new ApiError(httpStatus.UNAUTHORIZED, "User not found"));
+    }
 
     req.user = user;
     next();
-  } catch {
-    throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid token");
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      return next(new ApiError(httpStatus.UNAUTHORIZED, "Invalid token"));
+    }
+    next(error);
   }
 };

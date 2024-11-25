@@ -1,29 +1,45 @@
-import { NextFunction, Request, Response } from "express";
-import { Role } from "../models/role.model";
+import { Request, Response, NextFunction } from "express";
+import { User } from "../models/user.model";
+import { ResourceType } from "../config/resources";
+import { ActionType } from "../config/actions";
 import ApiError from "../utils/ApiError";
 import httpStatus from "../config/httpStatus";
 
-export const checkPermission = (resource: string, action: string) => {
+export const checkPermission = (resource: ResourceType, action: ActionType) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const user = req.user;
-      const role = await Role.findById(user?.role).populate("permissions");
+      if (!req.user) {
+        throw new ApiError(httpStatus.UNAUTHORIZED, "Unauthorized");
+      }
 
-      if (!role) throw new ApiError(httpStatus.NOT_FOUND, "Role not found");
+      const user = await User.findById(req.user.id).populate({
+        path: "role",
+        populate: {
+          path: "permissions",
+          model: "Permission",
+        },
+      });
 
-      const hasPermission = role.permissions.some(
-        (el) => el.resource === resource && el.action === action
+      if (!user) {
+        throw new ApiError(httpStatus.FORBIDDEN, "User not found");
+      }
+
+      const userRole = user.role as any;
+      const hasPermission = userRole.permissions.some(
+        (permission: any) =>
+          permission.resource === resource && permission.action === action
       );
 
-      if (!hasPermission)
-        throw new ApiError(httpStatus.FORBIDDEN, "Insufficient permissions");
+      if (!hasPermission) {
+        throw new ApiError(
+          httpStatus.UNAUTHORIZED,
+          "Forbidden: Insufficient permissions"
+        );
+      }
 
       next();
     } catch (error) {
-      throw new ApiError(
-        httpStatus.INTERNAL_SERVER_ERROR,
-        "Couldn't check permissions"
-      );
+      next(error);
     }
   };
 };

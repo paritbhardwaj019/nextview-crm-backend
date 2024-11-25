@@ -3,6 +3,7 @@ import {
   IUser,
   QueryUsersOptions,
   PaginateResult,
+  IRole,
 } from "../types";
 import ApiError from "../utils/ApiError";
 import httpStatus from "../config/httpStatus";
@@ -92,12 +93,56 @@ class UserService {
    * Delete multiple users by IDs.
    * @param ids - Array of user IDs to delete.
    * @returns void
+   * @throws {ApiError} If no users are found to delete.
    */
   async deleteMultipleUsers(ids: string[]): Promise<void> {
     const result = await User.deleteMany({ _id: { $in: ids } });
     if (result.deletedCount === 0) {
       throw new ApiError(httpStatus.NOT_FOUND, "No users found to delete");
     }
+  }
+
+  /**
+   * Get user options with roles for dropdowns or selections.
+   * @returns An array of users with `id`, `name`, and `role`.
+   */
+
+  async getUserOptions(): Promise<
+    { id: string; name: string; role: Pick<IRole, "id" | "name"> | null }[]
+  > {
+    const users = await User.find(
+      { status: "ACTIVE" },
+      { _id: 1, name: 1, role: 1 }
+    )
+      .populate({
+        path: "role",
+        select: "name _id",
+      })
+      .lean();
+
+    return users.map((user) => {
+      if (
+        user.role &&
+        typeof user.role === "object" &&
+        "_id" in user.role &&
+        "name" in user.role
+      ) {
+        return {
+          id: user._id.toString(),
+          name: user.name,
+          role: {
+            id: (user.role as IRole)._id.toString(),
+            name: (user.role as IRole).name,
+          },
+        };
+      }
+
+      return {
+        id: user._id.toString(),
+        name: user.name,
+        role: null,
+      };
+    });
   }
 }
 

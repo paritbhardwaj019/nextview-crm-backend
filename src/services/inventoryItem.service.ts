@@ -18,7 +18,12 @@ class InventoryItemService {
     const query: Record<string, any> = {};
 
     if (search) {
-      query.name = { $regex: search, $options: "i" };
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { location: { $regex: search, $options: "i" } },
+        { serialNumber: { $regex: search, $options: "i" } },
+        { supplier: { $regex: search, $options: "i" } },
+      ];
     }
 
     const sort: Record<string, 1 | -1> = {};
@@ -63,6 +68,36 @@ class InventoryItemService {
 
   async getInventoryItemById(id: string): Promise<IInventoryItem> {
     const inventoryItem = await InventoryItem.findById(id).populate("type");
+    if (!inventoryItem) {
+      throw new ApiError(httpStatus.NOT_FOUND, "Inventory Item not found");
+    }
+    return inventoryItem;
+  }
+
+  async updateMaintenanceDate(
+    id: string,
+    maintenanceDate: Date
+  ): Promise<IInventoryItem> {
+    const inventoryItem = await InventoryItem.findByIdAndUpdate(
+      id,
+      { lastMaintenanceDate: maintenanceDate },
+      { new: true }
+    );
+    if (!inventoryItem) {
+      throw new ApiError(httpStatus.NOT_FOUND, "Inventory Item not found");
+    }
+    return inventoryItem;
+  }
+
+  async updateReorderPoint(
+    id: string,
+    reorderPoint: number
+  ): Promise<IInventoryItem> {
+    const inventoryItem = await InventoryItem.findByIdAndUpdate(
+      id,
+      { reorderPoint },
+      { new: true }
+    );
     if (!inventoryItem) {
       throw new ApiError(httpStatus.NOT_FOUND, "Inventory Item not found");
     }

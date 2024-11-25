@@ -75,6 +75,10 @@ class InventoryTypeService {
     }
     return inventoryType;
   }
+
+  async getAllInventoryTypes(): Promise<IInventoryType[]> {
+    return await InventoryType.find();
+  }
 }
 
 export default new InventoryTypeService();

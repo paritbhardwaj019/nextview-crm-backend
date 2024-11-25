@@ -4,19 +4,17 @@ import { paginate } from "../plugins/paginate.plugin";
 
 const ticketSchema = new mongoose.Schema<ITicket>(
   {
-    customerId: {
+    title: {
       type: String,
       required: true,
-      trim: true,
     },
-    type: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "InventoryType",
-      required: true,
-    },
-    issueDescription: {
+    customer: {
       type: String,
+      ref: "Customer",
       required: true,
+    },
+    description: {
+      type: String,
     },
     priority: {
       type: String,
@@ -45,6 +43,10 @@ const ticketSchema = new mongoose.Schema<ITicket>(
     resolution: {
       type: String,
     },
+    ticketId: {
+      type: String,
+      unique: true,
+    },
   },
   {
     timestamps: true,
@@ -52,6 +54,18 @@ const ticketSchema = new mongoose.Schema<ITicket>(
     toObject: { virtuals: true },
   }
 );
+
+ticketSchema.pre("save", async function (next) {
+  if (!this.isNew) return next();
+
+  const lastTicket = await Ticket.findOne().sort({ createdAt: -1 });
+  const lastTicketNumber = lastTicket?.ticketId
+    ? parseInt(lastTicket.ticketId, 10)
+    : 0;
+
+  this.ticketId = String(lastTicketNumber + 1).padStart(6, "0");
+  next();
+});
 
 ticketSchema.plugin(paginate);
 

@@ -25,6 +25,38 @@ const inventoryItemSchema = new mongoose.Schema<IInventoryItem>(
       enum: Object.values(InventoryStatus),
       default: InventoryStatus.AVAILABLE,
     },
+    location: {
+      type: String,
+      trim: true,
+    },
+    serialNumber: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
+    warrantyExpiry: {
+      type: Date,
+    },
+    lastMaintenanceDate: {
+      type: Date,
+    },
+    reorderPoint: {
+      type: Number,
+      min: 0,
+    },
+    maxQuantity: {
+      type: Number,
+      min: 0,
+    },
+    unitCost: {
+      type: Number,
+      min: 0,
+    },
+    supplier: {
+      type: String,
+      trim: true,
+    },
   },
   {
     timestamps: true,

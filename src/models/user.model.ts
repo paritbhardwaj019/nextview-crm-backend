@@ -1,10 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
-import { IUser, PaginateModel } from "../types";
-
-interface IUserDocument extends Omit<IUser, "id"> {
-  comparePassword(userPassword: string): Promise<boolean>;
-}
+import { IUser, IUserDocument, PaginateModel } from "../types";
+import { paginate } from "../plugins/paginate.plugin";
 
 const userSchema = new mongoose.Schema<IUserDocument>(
   {
@@ -49,6 +46,8 @@ const userSchema = new mongoose.Schema<IUserDocument>(
     toObject: { virtuals: true },
   }
 );
+
+userSchema.plugin(paginate);
 
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();

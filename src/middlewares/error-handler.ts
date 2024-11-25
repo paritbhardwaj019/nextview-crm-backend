@@ -1,20 +1,53 @@
 import { Request, Response, NextFunction } from "express";
-import { AppError } from "../types";
+import { AppError, ApiError } from "../types";
+import logger from "../config/logger";
 
 const errorHandler = (
-  err: AppError,
+  err: Error | AppError | ApiError,
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  err.statusCode = err.statusCode || 500;
-  err.status = err.status || "error";
+  let statusCode = 500;
+  let status = "error";
+  let message = "Internal Server Error";
+  let stack: string | undefined;
 
-  res.status(err.statusCode).json({
-    status: err.status,
-    message: err.message,
-    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
-  });
+  logger.error(err);
+
+  if ("statusCode" in err) {
+    statusCode = err.statusCode;
+  }
+
+  if ("status" in err) {
+    status = err.status;
+  }
+
+  if (err instanceof Error) {
+    message = err.message;
+    stack = err.stack;
+  }
+
+  if (err instanceof ApiError) {
+    statusCode = err.statusCode;
+    status = "fail";
+    message = err.message;
+  }
+
+  const response: {
+    status: string;
+    message: string;
+    stack?: string;
+  } = {
+    status,
+    message,
+  };
+
+  if (process.env.NODE_ENV === "development") {
+    response.stack = stack;
+  }
+
+  res.status(statusCode).json(response);
 };
 
 export default errorHandler;

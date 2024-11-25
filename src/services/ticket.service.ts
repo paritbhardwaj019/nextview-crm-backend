@@ -19,6 +19,7 @@ class TicketService {
 
     if (search) {
       query.$or = [
+        { ticketId: { $regex: search, $options: "i" } },
         { customerId: { $regex: search, $options: "i" } },
         { issueDescription: { $regex: search, $options: "i" } },
       ];
@@ -31,11 +32,7 @@ class TicketService {
       page,
       limit,
       sort,
-      populate: [
-        { path: "type" },
-        { path: "assignedTo" },
-        { path: "createdBy" },
-      ],
+      populate: [{ path: "assignedTo customer" }, { path: "createdBy" }],
     };
 
     return await Ticket.paginate(query, options);

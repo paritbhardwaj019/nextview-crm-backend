@@ -19,9 +19,10 @@ class TicketController {
   });
 
   createTicket = catchAsync(async (req: Request, res: Response) => {
+    console.log("BODY", req.body);
     const ticket = await ticketService.createTicket({
       ...req.body,
-      createdBy: req.user._id,
+      createdBy: req?.user?.id,
     });
     res.status(httpStatus.CREATED).json(ticket);
   });

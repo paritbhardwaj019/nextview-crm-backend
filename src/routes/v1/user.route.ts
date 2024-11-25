@@ -1,7 +1,23 @@
 import express from "express";
 import userController from "../../controllers/user.controller";
+import { checkJWT } from "../../middlewares/checkJWT";
+import { checkPermission } from "../../middlewares/checkPermission";
+import { RESOURCES } from "../../config/resources";
+import { ACTIONS } from "../../config/actions";
 
 const router = express.Router();
+
+/**
+ * @route GET /users/options
+ * @desc Get user options for dropdowns or selections
+ * @access Protected
+ */
+router.get(
+  "/options",
+  checkJWT,
+  checkPermission(RESOURCES.USERS, ACTIONS.VIEW),
+  userController.getUsersOptionsHandler
+);
 
 /**
  * @route GET /users
@@ -13,7 +29,11 @@ const router = express.Router();
  */
 router
   .route("/")
-  .get(userController.queryUsersHandler)
+  .get(
+    checkJWT,
+    checkPermission(RESOURCES.USERS, ACTIONS.VIEW),
+    userController.queryUsersHandler
+  )
   .delete(userController.deleteMultipleUsersHandler);
 
 /**
@@ -29,8 +49,20 @@ router
  */
 router
   .route("/:id")
-  .get(userController.getUserByIdHandler)
-  .put(userController.updateUserHandler)
-  .delete(userController.deleteUserByIdHandler);
+  .get(
+    checkJWT,
+    checkPermission(RESOURCES.USERS, ACTIONS.VIEW),
+    userController.getUserByIdHandler
+  )
+  .put(
+    checkJWT,
+    checkPermission(RESOURCES.USERS, ACTIONS.EDIT),
+    userController.updateUserHandler
+  )
+  .delete(
+    checkJWT,
+    checkPermission(RESOURCES.USERS, ACTIONS.DELETE),
+    userController.deleteUserByIdHandler
+  );
 
 export default router;

@@ -18,6 +18,11 @@ class InventoryTypeController {
     res.status(httpStatus.OK).json(inventoryTypes);
   });
 
+  getAllInventoryTypes = catchAsync(async (req: Request, res: Response) => {
+    const inventoryTypes = await inventoryTypeService.getAllInventoryTypes();
+    res.status(httpStatus.OK).json(inventoryTypes);
+  });
+
   createInventoryType = catchAsync(async (req: Request, res: Response) => {
     const inventoryType = await inventoryTypeService.createInventoryType(
       req.body

@@ -1,15 +1,19 @@
 import mongoose from "mongoose";
-import { IInstallationRequest, PaginateModel } from "../types";
+import {
+  IInstallationRequest,
+  PaginateModel,
+  InstallationStatus,
+} from "../types";
 import { paginate } from "../plugins/paginate.plugin";
 
 const installationRequestSchema = new mongoose.Schema<IInstallationRequest>(
   {
-    customerId: {
-      type: String,
+    customer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
       required: true,
-      trim: true,
     },
-    productId: {
+    product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "InventoryItem",
       required: true,
@@ -17,8 +21,8 @@ const installationRequestSchema = new mongoose.Schema<IInstallationRequest>(
     status: {
       type: String,
       required: true,
-      default: "PENDING",
-      enum: ["PENDING", "SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"],
+      enum: Object.values(InstallationStatus),
+      default: InstallationStatus.PENDING,
     },
     assignedAgency: {
       type: String,

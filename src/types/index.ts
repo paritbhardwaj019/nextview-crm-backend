@@ -17,6 +17,8 @@ export interface IRole extends Document {
 
   createdAt?: Date;
   updatedAt?: Date;
+
+  _id: Types.ObjectId;
 }
 
 export interface IUser extends Document {
@@ -139,13 +141,14 @@ export interface IInventoryItem extends Document {
 
 export interface ITicket extends Document {
   id?: string;
-  customerId: string;
-  type: Types.ObjectId | IInventoryType;
-  issueDescription: string;
+  customer: Types.ObjectId | ICustomer;
+  description: string;
   priority: string;
   status: string;
   assignedTo: Types.ObjectId | IUser;
   createdBy: Types.ObjectId | IUser;
+  ticketId: string;
+  title: string;
 
   createdAt?: Date;
   updatedAt?: Date;
@@ -155,14 +158,14 @@ export interface ITicket extends Document {
 
 export interface IInstallationRequest extends Document {
   id?: string;
-  customerId: string;
-  productId: Types.ObjectId | IInventoryItem;
+  customer: Types.ObjectId | ICustomer;
+  product: Types.ObjectId | IInventoryItem;
   status: string;
   assignedAgency: string;
   scheduledDate: Date;
   completedDate?: Date;
-  verificationPhotos?: string[];
-  verificationVideos?: string[];
+  verificationPhotos: string[];
+  verificationVideos: string[];
 
   createdAt?: Date;
   updatedAt?: Date;
@@ -187,12 +190,15 @@ export interface AppError extends Error {
   status: string;
 }
 
+export type InventoryMovementStatus = "pending" | "completed" | "cancelled";
+
 export interface IInventoryMovement extends Document {
   id?: string;
   inventoryItem: Types.ObjectId | IInventoryItem;
   type: "dispatch" | "return";
   quantity: number;
   reference: Types.ObjectId | ITicket | IInstallationRequest;
+  referenceModel: "Ticket" | "InstallationRequest";
   status: "pending" | "completed" | "cancelled";
   notes?: string;
   createdBy: Types.ObjectId | IUser;
@@ -234,4 +240,73 @@ export interface INotification extends Document {
 
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+export interface AppError extends Error {
+  statusCode: number;
+  status: string;
+}
+
+export class ApiError extends Error {
+  statusCode: number;
+  status: string;
+
+  constructor(statusCode: number, message: string) {
+    super(message);
+    this.statusCode = statusCode;
+    this.status = "fail";
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+export interface IUserDocument extends IUser {
+  _id: Types.ObjectId;
+  comparePassword(userPassword: string): Promise<boolean>;
+}
+
+export interface ICustomer extends Document {
+  id?: Types.ObjectId;
+  customerId: string;
+  name: string;
+  email: string;
+  contact: string;
+  address?: string;
+  createdBy: IUser | Types.ObjectId;
+  tickets?: Types.ObjectId[];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface QueryCustomersOptions {
+  search?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  page?: number;
+  limit?: number;
+}
+
+export type MediaType = "images" | "videos";
+
+export interface FileValidation {
+  type: MediaType;
+  maxSize: number;
+  allowedMimeTypes: string[];
+}
+
+export interface MediaFile {
+  url: string;
+  type: MediaType;
+  createdAt: Date;
+}
+
+export enum InstallationStatus {
+  PENDING = "PENDING",
+  SCHEDULED = "SCHEDULED",
+  IN_PROGRESS = "IN_PROGRESS",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
+
+  VERIFICATION_PENDING = "VERIFICATION_PENDING",
+  VERIFIED = "VERIFIED",
+  REJECTED = "REJECTED",
 }

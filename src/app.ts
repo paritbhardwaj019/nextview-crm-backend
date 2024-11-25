@@ -6,7 +6,7 @@ import mongoSanitize from "express-mongo-sanitize";
 import hpp from "hpp";
 import routes from "./routes/v1";
 import errorHandler from "./middlewares/error-handler";
-import { AppError } from "./types";
+import ApiError from "./utils/ApiError";
 
 const app = express();
 
@@ -28,12 +28,9 @@ app.use("/api/v1", routes);
 app.use(errorHandler);
 
 app.all("*", (req: Request, res: Response, next: NextFunction) => {
-  const err = new Error(
-    `Can't find ${req.originalUrl} on this server!`
-  ) as AppError;
-  err.statusCode = 404;
-  err.status = "fail";
-  next(err);
+  next(new ApiError(404, `Can't find ${req.originalUrl} on this server!`));
 });
+
+app.use(errorHandler);
 
 export default app;
