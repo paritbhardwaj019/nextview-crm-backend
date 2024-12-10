@@ -2,16 +2,47 @@ import httpStatus from "../config/httpStatus";
 import { InstallationRequest } from "../models/installationRequest.model";
 import { InventoryItem } from "../models/inventoryItem.model";
 import { InventoryMovement } from "../models/inventoryMovement.model";
+import { Role } from "../models/role.model";
 import { Ticket } from "../models/ticket.model";
+import { User } from "../models/user.model";
 import {
+  IInstallationRequest,
+  IInventoryItem,
   IInventoryMovement,
   InventoryMovementStatus,
+  ITicket,
+  MovementType,
   PaginateOptions,
   PaginateResult,
 } from "../types";
 import ApiError from "../utils/ApiError";
+import notificationService from "./notification.service";
+import { Types } from "mongoose";
 
 class InventoryMovementService {
+  private async getInventoryManagers(): Promise<{ id: string }[]> {
+    const inventoryManagerRole = await Role.findOne({
+      name: "Inventory Manager",
+    });
+    return await User.find({ role: inventoryManagerRole?.id }).select("id");
+  }
+
+  private async checkAndNotifyLowStock(
+    inventoryItem: IInventoryItem
+  ): Promise<void> {
+    if (inventoryItem.quantity <= (inventoryItem.reorderPoint || 0)) {
+      const inventoryManagers = await this.getInventoryManagers();
+
+      for (const manager of inventoryManagers) {
+        await notificationService.createInventoryLowNotification(
+          inventoryItem.id!,
+          manager.id,
+          inventoryItem.name
+        );
+      }
+    }
+  }
+
   async createInventoryMovement(
     data: Partial<IInventoryMovement>
   ): Promise<IInventoryMovement> {
@@ -48,14 +79,16 @@ class InventoryMovementService {
       );
     }
 
-    let refDoc;
+    let refDoc: ITicket | IInstallationRequest | null = null;
+    const refId = reference.toString();
+
     if (referenceModel === "Ticket") {
-      refDoc = await Ticket.findById(reference);
+      refDoc = await Ticket.findById(refId);
       if (!refDoc) {
         throw new ApiError(httpStatus.NOT_FOUND, "Ticket not found");
       }
     } else if (referenceModel === "InstallationRequest") {
-      refDoc = await InstallationRequest.findById(reference);
+      refDoc = await InstallationRequest.findById(refId);
       if (!refDoc) {
         throw new ApiError(
           httpStatus.NOT_FOUND,
@@ -64,15 +97,66 @@ class InventoryMovementService {
       }
     }
 
+    if (type === MovementType.DISPATCH) {
+      if (quantity > item.quantity) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Insufficient stock. Only ${item.quantity} units available.`
+        );
+      }
+
+      item.quantity -= quantity;
+
+      console.log("---ITEM---", item);
+
+      if (item.quantity <= (item.reorderPoint || 0)) {
+        await this.checkAndNotifyLowStock(item);
+      }
+
+      if (referenceModel === "Ticket") {
+        const userId =
+          typeof createdBy === "string" ? createdBy : createdBy.toString();
+        await notificationService.createPartDispatchNotification(
+          refId,
+          userId,
+          item.name
+        );
+      }
+    } else if (type === MovementType.RETURN) {
+      item.quantity += quantity;
+
+      if (referenceModel === "Ticket") {
+        const userId =
+          typeof createdBy === "string" ? createdBy : createdBy.toString();
+        await notificationService.createNotification({
+          type: "part_return",
+          message: `${quantity} unit(s) of ${item.name} have been returned to inventory.`,
+          recipient: new Types.ObjectId(userId),
+          reference: new Types.ObjectId(item.id),
+          referenceModel: "InventoryItem",
+          status: "unread",
+        });
+      }
+    } else {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        "Invalid movement type. Must be 'DISPATCH' or 'RETURN'"
+      );
+    }
+
+    await item.save();
+
     const inventoryMovement = new InventoryMovement({
-      inventoryItem,
+      inventoryItem: new Types.ObjectId(inventoryItem.toString()),
       type,
       quantity,
-      reference,
+      reference: new Types.ObjectId(refId),
       referenceModel,
       status: "pending",
       notes,
-      createdBy,
+      createdBy: new Types.ObjectId(
+        typeof createdBy === "string" ? createdBy : createdBy.toString()
+      ),
     });
 
     const movement = await inventoryMovement.save();

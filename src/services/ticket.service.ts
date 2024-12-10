@@ -69,6 +69,17 @@ class TicketService {
     }
     return ticket;
   }
+
+  async getTicketOptions(): Promise<
+    { ticketId: string; _id: string; id: string }[]
+  > {
+    const tickets = (await Ticket.find({}, "ticketId _id id")) as {
+      ticketId: string;
+      _id: string;
+      id: string;
+    }[];
+    return tickets;
+  }
 }
 
 export default new TicketService();

@@ -65,6 +65,12 @@ const inventoryItemSchema = new mongoose.Schema<IInventoryItem>(
   }
 );
 
+inventoryItemSchema.virtual("movements", {
+  ref: "InventoryMovement",
+  localField: "_id",
+  foreignField: "inventoryItem",
+});
+
 inventoryItemSchema.plugin(paginate);
 
 export const InventoryItem = mongoose.model<

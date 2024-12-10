@@ -11,6 +11,10 @@ const router = express.Router();
 const uploadMiddleware = uploadConfig.any;
 
 router
+  .route("/options")
+  .get(checkJWT, installationRequestController.getInstallationRequestOptions);
+
+router
   .route("/")
   .get(
     checkJWT,

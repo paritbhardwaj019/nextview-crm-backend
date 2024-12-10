@@ -70,9 +70,24 @@ class RoleController {
    */
   getRoleByIdHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
+      console.log("---ROLE--ID---", req.params.id);
+
       const id = req.params.id;
       const role = await RoleService.getRoleById(id);
       res.status(httpStatus.OK).json(role);
+    }
+  );
+
+  /**
+   * Handle retrieving role options.
+   * @param req - Express request object.
+   * @param res - Express response object.
+   * @param next - Express next middleware function.
+   */
+  getRoleOptionsHandler = catchAsync(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const options = await RoleService.getRoleOptions();
+      res.status(httpStatus.OK).json(options);
     }
   );
 }

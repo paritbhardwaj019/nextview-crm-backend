@@ -8,6 +8,8 @@ import {
 import ApiError from "../utils/ApiError";
 import httpStatus from "../config/httpStatus";
 import { User } from "../models/user.model";
+import emailService from "./email.service";
+import crypto from "crypto";
 
 class UserService {
   /**
@@ -143,6 +145,61 @@ class UserService {
         role: null,
       };
     });
+  }
+
+  /**
+   * Add new user with temporary password
+   * @param userData - User data including email, name, and role
+   */
+
+  async addUserHandler(userData: {
+    email: string;
+    name: string;
+    role: string;
+    contact?: string;
+  }) {
+    const existingUser = await User.findOne({ email: userData.email });
+    if (existingUser) {
+      throw new ApiError(httpStatus.BAD_REQUEST, "Email already registered");
+    }
+
+    const tempPassword = this.generateTemporaryPassword();
+
+    const user = await User.create({
+      ...userData,
+      password: tempPassword,
+      status: "INACTIVE",
+    });
+
+    await emailService.sendEmail(
+      userData.email,
+      "Welcome - Your Temporary Password",
+      `
+        <h1>Welcome ${userData.name}!</h1>
+        <p>Your account has been created. Please use the following temporary password to login:</p>
+        <p><strong>${tempPassword}</strong></p>
+        <p>Please change your password after your first login.</p>
+      `
+    );
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      status: user.status,
+    };
+  }
+
+  /**
+   * Generate a random password of specified length
+   * @param length - Length of the password
+   */
+  private generateTemporaryPassword(length: number = 10): string {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+    return Array.from(crypto.getRandomValues(new Uint32Array(length)))
+      .map((x) => chars[x % chars.length])
+      .join("");
   }
 }
 

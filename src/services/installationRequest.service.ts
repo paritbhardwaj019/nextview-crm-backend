@@ -201,6 +201,17 @@ class InstallationRequestService {
     return uploadedUrls;
   }
 
+  async getInstallationRequestOptions(): Promise<
+    { installationRequestId: string; _id: string; id: string }[]
+  > {
+    const installationRequests = (await InstallationRequest.find(
+      {},
+      "installationRequestId _id id"
+    )) as { installationRequestId: string; _id: string; id: string }[];
+
+    return installationRequests;
+  }
+
   private async cleanupMediaFiles(urls: string[]): Promise<void> {
     const deletePromises = urls.map((url) => {
       const filePathMatch = url.match(/o\/(.*?)\?/);

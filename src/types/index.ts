@@ -23,7 +23,6 @@ export interface IRole extends Document {
 
 export interface IUser extends Document {
   id?: string;
-
   name: string;
   email: string;
   password: string;
@@ -31,6 +30,8 @@ export interface IUser extends Document {
   contact?: string;
   status: "ACTIVE" | "INACTIVE";
   lastLogin?: Date;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
 }
 
 export interface CreateRoleDTO {
@@ -157,24 +158,28 @@ export interface ITicket extends Document {
 }
 
 export interface IInstallationRequest extends Document {
-  id?: string;
-  customer: Types.ObjectId | ICustomer;
-  product: Types.ObjectId | IInventoryItem;
-  status: string;
+  id: string;
+  installationRequestId: string;
+  customer: Types.ObjectId;
+  product: Types.ObjectId;
+  status: InstallationStatus;
   assignedAgency: string;
   scheduledDate: Date;
   completedDate?: Date;
   verificationPhotos: string[];
   verificationVideos: string[];
-
-  createdAt?: Date;
-  updatedAt?: Date;
+  reference: Types.ObjectId;
+  referenceModel: "Ticket" | "InstallationRequest";
+  quantity: number;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface ICourierTracking extends Document {
   id?: string;
   ticket: Types.ObjectId | ITicket;
-  inventoryItem: Types.ObjectId | IInventoryItem;
+  inventoryItems: Types.ObjectId[] | IInventoryItem[];
   courierService: string;
   trackingNumber: string;
   status: string;
@@ -195,7 +200,7 @@ export type InventoryMovementStatus = "pending" | "completed" | "cancelled";
 export interface IInventoryMovement extends Document {
   id?: string;
   inventoryItem: Types.ObjectId | IInventoryItem;
-  type: "dispatch" | "return";
+  type: MovementType;
   quantity: number;
   reference: Types.ObjectId | ITicket | IInstallationRequest;
   referenceModel: "Ticket" | "InstallationRequest";
@@ -237,6 +242,7 @@ export interface INotification extends Document {
   status: "unread" | "read";
   recipient: Types.ObjectId | IUser;
   reference?: Types.ObjectId | IInventoryItem | ITicket;
+  referenceModel?: "InventoryItem" | "Ticket";
 
   createdAt?: Date;
   updatedAt?: Date;
@@ -309,4 +315,9 @@ export enum InstallationStatus {
   VERIFICATION_PENDING = "VERIFICATION_PENDING",
   VERIFIED = "VERIFIED",
   REJECTED = "REJECTED",
+}
+
+export enum MovementType {
+  DISPATCH = "dispatch",
+  RETURN = "return",
 }

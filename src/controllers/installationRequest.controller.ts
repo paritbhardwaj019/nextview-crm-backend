@@ -53,6 +53,14 @@ class InstallationRequestController {
       await installationRequestService.getInstallationRequestById(id);
     res.status(httpStatus.OK).json(installationRequest);
   });
+
+  getInstallationRequestOptions = catchAsync(
+    async (req: Request, res: Response) => {
+      const options =
+        await installationRequestService.getInstallationRequestOptions();
+      res.status(httpStatus.OK).json(options);
+    }
+  );
 }
 
 export default new InstallationRequestController();

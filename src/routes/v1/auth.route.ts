@@ -10,4 +10,18 @@ const router = express.Router();
  */
 router.post("/login", authController.loginHandler);
 
+/**
+ * @route POST /auth/forgot-password
+ * @desc Send password reset email
+ * @access Public
+ */
+router.post("/forgot-password", authController.forgotPassword);
+
+/**
+ * @route POST /auth/reset-password
+ * @desc Reset password with token
+ * @access Public
+ */
+router.post("/reset-password", authController.resetPassword);
+
 export default router;

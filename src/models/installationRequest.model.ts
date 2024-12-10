@@ -8,6 +8,11 @@ import { paginate } from "../plugins/paginate.plugin";
 
 const installationRequestSchema = new mongoose.Schema<IInstallationRequest>(
   {
+    installationRequestId: {
+      type: String,
+      unique: true,
+      trim: true,
+    },
     customer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Customer",
@@ -49,6 +54,21 @@ const installationRequestSchema = new mongoose.Schema<IInstallationRequest>(
     toObject: { virtuals: true },
   }
 );
+
+installationRequestSchema.pre("save", async function (next) {
+  if (!this.isNew) return next();
+
+  const lastInstallationRequest = await InstallationRequest.findOne()
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const lastRequestNumber = lastInstallationRequest?.installationRequestId
+    ? parseInt(lastInstallationRequest.installationRequestId, 10)
+    : 0;
+
+  this.installationRequestId = String(lastRequestNumber + 1).padStart(6, "0");
+  next();
+});
 
 installationRequestSchema.plugin(paginate);
 

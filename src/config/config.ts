@@ -10,6 +10,10 @@ const config = {
   mongoose: {
     url: process.env.DATABASE_URL!,
   },
+  resend: {
+    apiKey: process.env.RESEND_API_KEY,
+    fromEmail: process.env.RESEND_FROM_EMAIL,
+  },
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID!,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
@@ -18,6 +22,7 @@ const config = {
       : "",
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET!,
   },
+  frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
 };
 
 export default config;

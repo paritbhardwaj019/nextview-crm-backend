@@ -29,6 +29,11 @@ router.get(
  */
 router
   .route("/")
+  .post(
+    checkJWT,
+    checkPermission(RESOURCES.USERS, ACTIONS.CREATE),
+    userController.addUser
+  )
   .get(
     checkJWT,
     checkPermission(RESOURCES.USERS, ACTIONS.VIEW),

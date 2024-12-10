@@ -18,6 +18,22 @@ class AuthController {
       res.status(httpStatus.OK).json(result);
     }
   );
+
+  forgotPassword = catchAsync(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { email } = req.body;
+      const result = await authService.forgotPasswordHandler(email);
+      res.status(httpStatus.OK).json(result);
+    }
+  );
+
+  resetPassword = catchAsync(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { token, newPassword } = req.body;
+      const result = await authService.resetPasswordHandler(token, newPassword);
+      res.status(httpStatus.OK).json(result);
+    }
+  );
 }
 
 export default new AuthController();

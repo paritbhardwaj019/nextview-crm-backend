@@ -44,6 +44,11 @@ class TicketController {
     const ticket = await ticketService.getTicketById(id);
     res.status(httpStatus.OK).json(ticket);
   });
+
+  getTicketOptions = catchAsync(async (req: Request, res: Response) => {
+    const options = await ticketService.getTicketOptions();
+    res.status(httpStatus.OK).json(options);
+  });
 }
 
 export default new TicketController();

@@ -8,6 +8,18 @@ import { checkPermission } from "../../middlewares/checkPermission";
 const router = express.Router();
 
 /**
+ * @route GET /roles/options
+ * @desc Get role options (id and name)
+ * @access Protected
+ */
+router.get(
+  "/options",
+  checkJWT,
+  checkPermission(RESOURCES.ROLES, ACTIONS.VIEW),
+  roleController.getRoleOptionsHandler
+);
+
+/**
  * @route GET /roles
  * @desc Query roles with pagination, sorting, and searching
  * @route POST /roles

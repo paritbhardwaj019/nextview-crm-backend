@@ -1,7 +1,15 @@
-import { ICourierTracking, PaginateResult, QueryRolesOptions } from "../types";
+import {
+  ICourierTracking,
+  IInventoryItem,
+  PaginateResult,
+  QueryRolesOptions,
+} from "../types";
 import ApiError from "../utils/ApiError";
 import httpStatus from "../config/httpStatus";
 import { CourierTracking } from "../models/courierTracking.model";
+import PDFDocument from "pdfkit";
+import path from "path";
+import fs from "fs";
 
 class CourierTrackingService {
   async queryCourierTrackings(
@@ -73,6 +81,65 @@ class CourierTrackingService {
       throw new ApiError(httpStatus.NOT_FOUND, "Courier Tracking not found");
     }
     return courierTracking;
+  }
+
+  async generateLabel(id: string) {
+    const courierTracking = await this.getCourierTrackingById(id);
+
+    const doc = new PDFDocument({
+      size: "A4",
+      margin: 50,
+    });
+
+    const buffers: Buffer[] = [];
+    doc.on("data", buffers.push.bind(buffers));
+    doc.on("end", () => {});
+
+    const logoPath = path.join(__dirname, "../assets/logo.png");
+
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, 50, 45, { width: 100 });
+    }
+
+    doc
+      .fontSize(20)
+      .text("NEXTVIEW", 160, 50, { align: "left" })
+      .fontSize(10)
+      .text(
+        "409 – 410 MAURYA ATRIA, NR. ATITHI RESTAURANT CROSS ROAD, ABOVE MEHSANA NAGRIK BANK JUDGES BUNGLOW RD",
+        160,
+        75,
+        { align: "left" }
+      )
+      .text("BODAKDEV, AHMEDABAD, GUJARAT - 380054", 160, 90, { align: "left" })
+      .moveDown();
+
+    const inventoryItems = courierTracking.inventoryItems as IInventoryItem[];
+
+    if (inventoryItems && Array.isArray(inventoryItems)) {
+      doc.font("Helvetica-Bold").fontSize(12);
+      doc.text("Inventory Items", { underline: true });
+      doc.font("Helvetica").fontSize(10);
+
+      let y = doc.y + 10;
+      doc.text("NAME", 50, y, { width: 150, continued: true });
+      doc.text("QUANTITY", { align: "right" });
+      y += 20;
+
+      inventoryItems.forEach((item) => {
+        doc.text(item.name, 50, y, { width: 150, continued: true });
+        doc.text(item.quantity.toString(), { align: "right" });
+        y += 20;
+      });
+    }
+
+    return new Promise<Buffer>((resolve, reject) => {
+      doc.on("end", () => {
+        const pdfBuffer = Buffer.concat(buffers);
+        resolve(pdfBuffer);
+      });
+      doc.end();
+    });
   }
 }
 

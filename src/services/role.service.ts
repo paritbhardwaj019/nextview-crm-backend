@@ -105,6 +105,18 @@ class RoleService {
 
     return role;
   }
+
+  /**
+   * Get role options with limited fields (e.g., id and name).
+   * @returns Array of roles with limited fields.
+   */
+  async getRoleOptions(): Promise<{ id: string; name: string }[]> {
+    const roles = (await Role.find({}, "id name").sort({ name: 1 })) as {
+      id: string;
+      name: string;
+    }[];
+    return roles;
+  }
 }
 
 export default new RoleService();

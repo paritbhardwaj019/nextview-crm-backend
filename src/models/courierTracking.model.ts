@@ -9,11 +9,13 @@ const courierTrackingSchema = new mongoose.Schema<ICourierTracking>(
       ref: "Ticket",
       required: true,
     },
-    inventoryItem: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "InventoryItem",
-      required: true,
-    },
+    inventoryItems: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "InventoryItem",
+        required: true,
+      },
+    ],
     courierService: {
       type: String,
       required: true,

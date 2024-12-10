@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import UserService from "../services/user.service";
+import userService from "../services/user.service";
 import { UpdateUserDTO } from "../types";
 import httpStatus from "../config/httpStatus";
 import { catchAsync } from "../utils/catchAsync";
@@ -14,7 +14,7 @@ class UserController {
   queryUsersHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
       const filter = req.query as any;
-      const users = await UserService.queryUsers(filter);
+      const users = await userService.queryUsers(filter);
       res.status(httpStatus.OK).json(users);
     }
   );
@@ -29,7 +29,7 @@ class UserController {
     async (req: Request, res: Response, next: NextFunction) => {
       const id = req.params.id;
       const data: UpdateUserDTO = req.body;
-      const user = await UserService.updateUser(id, data);
+      const user = await userService.updateUser(id, data);
       res.status(httpStatus.OK).json(user);
     }
   );
@@ -43,7 +43,7 @@ class UserController {
   getUserByIdHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
       const id = req.params.id;
-      const user = await UserService.getUserById(id);
+      const user = await userService.getUserById(id);
       res.status(httpStatus.OK).json(user);
     }
   );
@@ -57,7 +57,7 @@ class UserController {
   deleteUserByIdHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
       const id = req.params.id;
-      await UserService.deleteUserById(id);
+      await userService.deleteUserById(id);
       res.status(httpStatus.NO_CONTENT).send();
     }
   );
@@ -71,7 +71,7 @@ class UserController {
   deleteMultipleUsersHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
       const ids: string[] = req.body.ids;
-      await UserService.deleteMultipleUsers(ids);
+      await userService.deleteMultipleUsers(ids);
       res.status(httpStatus.NO_CONTENT).send();
     }
   );
@@ -84,8 +84,15 @@ class UserController {
    */
   getUsersOptionsHandler = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
-      const options = await UserService.getUserOptions();
+      const options = await userService.getUserOptions();
       res.status(httpStatus.OK).json(options);
+    }
+  );
+
+  addUser = catchAsync(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const result = await userService.addUserHandler(req.body);
+      res.status(httpStatus.CREATED).json(result);
     }
   );
 }

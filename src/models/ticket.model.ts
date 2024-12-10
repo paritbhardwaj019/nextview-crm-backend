@@ -46,6 +46,7 @@ const ticketSchema = new mongoose.Schema<ITicket>(
     ticketId: {
       type: String,
       unique: true,
+      trim: true,
     },
   },
   {
