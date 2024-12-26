@@ -109,6 +109,7 @@ export interface IInventoryType extends Document {
   description?: string;
   category: "hardware" | "accessory" | "component";
   reorderThreshold: number;
+  headers: [string];
 
   createdAt?: Date;
   updatedAt?: Date;
