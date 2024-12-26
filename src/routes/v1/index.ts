@@ -12,6 +12,7 @@ import ticketRoutes from "./ticket.route";
 import customerRoutes from "./customer.route";
 import dashboardRoutes from "./dashboard.route";
 import notificationRoutes from "./notification.route";
+import problemRoutes from "./problem.route";
 
 const router = express.Router();
 
@@ -28,5 +29,6 @@ router.use("/tickets", ticketRoutes);
 router.use("/customers", customerRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/problems", problemRoutes);
 
 export default router;

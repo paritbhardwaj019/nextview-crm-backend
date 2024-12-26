@@ -11,6 +11,7 @@ export const RESOURCES = {
   NOTIFICATIONS: "NOTIFICATIONS",
   CUSTOMERS: "CUSTOMERS",
   DASHBOARD: "DASHBOARD",
+  PROBLEMS: "PROBLEMS",
 } as const;
 
 export type ResourceType = (typeof RESOURCES)[keyof typeof RESOURCES];
