@@ -24,6 +24,10 @@ const inventoryTypeSchema = new mongoose.Schema<IInventoryType>(
       required: true,
       min: 0,
     },
+    headers: {
+      type: [String],
+      required: true,
+    }
   },
   {
     timestamps: true,
