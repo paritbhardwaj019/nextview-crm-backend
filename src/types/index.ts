@@ -321,3 +321,14 @@ export enum MovementType {
   DISPATCH = "dispatch",
   RETURN = "return",
 }
+
+export interface IProblem extends Document {
+  id?: string;
+  type: Types.ObjectId | IInventoryType;
+  problem?: string;
+
+  createdAt?: Date;
+  updatedAt?: Date;
+
+  _id: Types.ObjectId;
+}
