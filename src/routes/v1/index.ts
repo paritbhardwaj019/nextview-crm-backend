@@ -13,6 +13,7 @@ import customerRoutes from "./customer.route";
 import dashboardRoutes from "./dashboard.route";
 import notificationRoutes from "./notification.route";
 import problemRoutes from "./problem.route";
+import serialNumberRoutes from "./serialNumber.route";
 
 const router = express.Router();
 
@@ -30,5 +31,6 @@ router.use("/customers", customerRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/problems", problemRoutes);
+router.use("/serial-numbers", serialNumberRoutes);
 
 export default router;

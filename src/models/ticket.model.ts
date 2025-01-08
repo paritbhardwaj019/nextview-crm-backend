@@ -30,12 +30,10 @@ const ticketSchema = new mongoose.Schema<ITicket>(
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
     },
     resolvedAt: {
       type: Date,
@@ -48,6 +46,20 @@ const ticketSchema = new mongoose.Schema<ITicket>(
       unique: true,
       trim: true,
     },
+    item: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "InventoryItem",
+    },
+    serialNumber: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SerialNumber",
+    },
+    problems: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Problem",
+      },
+    ],
   },
   {
     timestamps: true,

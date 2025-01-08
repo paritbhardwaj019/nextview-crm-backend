@@ -137,20 +137,32 @@ export interface IInventoryItem extends Document {
   unitCost?: number;
   supplier?: string;
 
+  visibleToCustomer?: boolean;
+  serialNumbers?: Types.ObjectId[];
+
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+export interface ISerialNumber extends Document {
+  inventoryItem: Types.ObjectId;
+  details: Record<string, string>;
 }
 
 export interface ITicket extends Document {
   id?: string;
   customer: Types.ObjectId | ICustomer;
   description: string;
-  priority: string;
-  status: string;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
   assignedTo: Types.ObjectId | IUser;
   createdBy: Types.ObjectId | IUser;
   ticketId: string;
   title: string;
+
+  item: Types.ObjectId | IInventoryItem;
+  serialNumber: Types.ObjectId | ISerialNumber;
+  problems: (Types.ObjectId | IProblem)[];
 
   createdAt?: Date;
   updatedAt?: Date;

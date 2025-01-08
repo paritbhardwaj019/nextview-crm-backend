@@ -51,6 +51,16 @@ class ProblemController {
     const problem = await problemService.getProblemById(id);
     res.status(httpStatus.OK).json(problem);
   });
+
+  getProblemsByInventoryType = catchAsync(
+    async (req: Request, res: Response) => {
+      const { inventoryTypeId } = req.params;
+      const problems = await problemService.getProblemsByInventoryType(
+        inventoryTypeId
+      );
+      res.status(httpStatus.OK).json(problems);
+    }
+  );
 }
 
 export default new ProblemController();

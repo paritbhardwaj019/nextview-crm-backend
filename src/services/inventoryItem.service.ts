@@ -246,6 +246,22 @@ class InventoryItemService {
       }
     }
   }
+
+  async getAllVisibleInventoryItems(): Promise<IInventoryItem[]> {
+    const inventoryItems = await InventoryItem.find({
+      visibleToCustomer: true,
+    })
+      .populate("type", "name")
+      .populate({
+        path: "serialNumbers",
+        select: "number status",
+      })
+      .select(
+        "name type serialNumbers location warrantyExpiry status quantity"
+      );
+
+    return inventoryItems;
+  }
 }
 
 export default new InventoryItemService();

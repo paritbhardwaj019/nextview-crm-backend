@@ -8,6 +8,10 @@ import { ACTIONS } from "../../config/actions";
 const router = express.Router();
 
 router
+  .route("/inventory-type/:inventoryTypeId")
+  .get(checkJWT, problemController.getProblemsByInventoryType);
+
+router
   .route("/")
   .get(
     checkJWT,
@@ -20,13 +24,11 @@ router
     problemController.createProblem
   );
 
-router
-  .route("/options")
-  .get(
-    checkJWT,
-    // checkPermission(RESOURCES.PROBLEMS, ACTIONS.VIEW),
-    problemController.getAllProblems
-  );
+router.route("/options").get(
+  checkJWT,
+  // checkPermission(RESOURCES.PROBLEMS, ACTIONS.VIEW),
+  problemController.getAllProblems
+);
 
 router
   .route("/:id")

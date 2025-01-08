@@ -7,6 +7,8 @@ import ticketController from "../../controllers/ticket.controller";
 
 const router = express.Router();
 
+router.post("/customer", ticketController.createTicketWithCustomer);
+
 router.route("/options").get(checkJWT, ticketController.getTicketOptions);
 
 router

@@ -9,6 +9,10 @@ router
   .post(inventoryItemController.createInventoryItem);
 
 router
+  .route("/visible")
+  .get(inventoryItemController.getAllVisibleInventoryItems);
+
+router
   .route("/:id")
   .get(inventoryItemController.getInventoryItem)
   .patch(inventoryItemController.updateInventoryItem)

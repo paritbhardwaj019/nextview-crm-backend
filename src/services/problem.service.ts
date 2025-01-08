@@ -18,40 +18,39 @@ class ProblemService {
     const query: Record<string, any> = {};
 
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-      ];
+      query.$or = [{ problem: { $regex: search, $options: "i" } }];
     }
 
     const sort: Record<string, 1 | -1> = {};
     sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
-    const options = { page, limit, sort };
+    const options = {
+      page,
+      limit,
+      sort,
+      populate: [
+        {
+          path: "type",
+          select: "name",
+        },
+      ],
+    };
 
     return await Problem.paginate(query, options);
   }
 
-  async createProblem(
-    data: Partial<IProblem>
-  ): Promise<IProblem> {
+  async createProblem(data: Partial<IProblem>): Promise<IProblem> {
     const existingType = await Problem.findOne({ problem: data.problem });
 
     if (existingType) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        "Problem already exists"
-      );
+      throw new ApiError(httpStatus.BAD_REQUEST, "Problem already exists");
     }
 
     const problem = new Problem(data);
     return problem.save();
   }
 
-  async updateProblem(
-    id: string,
-    data: Partial<IProblem>
-  ): Promise<IProblem> {
+  async updateProblem(id: string, data: Partial<IProblem>): Promise<IProblem> {
     const problem = await Problem.findByIdAndUpdate(id, data, {
       new: true,
     });
@@ -78,6 +77,13 @@ class ProblemService {
 
   async getAllProblems(): Promise<IProblem[]> {
     return await Problem.find();
+  }
+
+  async getProblemsByInventoryType(
+    inventoryTypeId: string
+  ): Promise<IProblem[]> {
+    const problems = await Problem.find({ type: inventoryTypeId });
+    return problems;
   }
 }
 

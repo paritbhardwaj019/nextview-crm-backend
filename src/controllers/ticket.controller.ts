@@ -2,8 +2,43 @@ import { Request, Response, NextFunction } from "express";
 import ticketService from "../services/ticket.service";
 import httpStatus from "../config/httpStatus";
 import { catchAsync } from "../utils/catchAsync";
+import { InventoryItem } from "../models/inventoryItem.model";
+import ApiError from "../utils/ApiError";
 
 class TicketController {
+  createTicketWithCustomer = catchAsync(async (req: Request, res: Response) => {
+    const {
+      title,
+      customer,
+      email,
+      description,
+      inventoryItem,
+      serialNumber,
+      problems = [], // Default to empty array if not provided
+    } = req.body;
+
+    const itemExists = await InventoryItem.exists({ _id: inventoryItem });
+    if (!itemExists) {
+      throw new ApiError(httpStatus.BAD_REQUEST, "Invalid inventory item");
+    }
+
+    const ticket = await ticketService.createTicketWithCustomer({
+      title,
+      customer,
+      email,
+      description,
+      inventoryItem,
+      serialNumber,
+      problems,
+    });
+
+    res.status(httpStatus.CREATED).json({
+      message: "Ticket created successfully",
+      data: ticket,
+      ticket_id: ticket.ticketId,
+    });
+  });
+
   getTickets = catchAsync(async (req: Request, res: Response) => {
     const { search, page, limit, sortBy, sortOrder } = req.query;
 

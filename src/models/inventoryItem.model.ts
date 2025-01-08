@@ -57,6 +57,16 @@ const inventoryItemSchema = new mongoose.Schema<IInventoryItem>(
       type: String,
       trim: true,
     },
+    visibleToCustomer: {
+      type: Boolean,
+      default: true,
+    },
+    serialNumbers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "SerialNumber",
+      },
+    ],
   },
   {
     timestamps: true,

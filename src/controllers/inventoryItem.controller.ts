@@ -45,6 +45,14 @@ class InventoryItemController {
     const inventoryItem = await inventoryItemService.getInventoryItemById(id);
     res.status(httpStatus.OK).json(inventoryItem);
   });
+
+  getAllVisibleInventoryItems = catchAsync(
+    async (req: Request, res: Response) => {
+      const inventoryItems =
+        await inventoryItemService.getAllVisibleInventoryItems();
+      res.status(httpStatus.OK).json(inventoryItems);
+    }
+  );
 }
 
 export default new InventoryItemController();

@@ -6,23 +6,19 @@ const customerSchema = new mongoose.Schema<ICustomer>(
   {
     customerId: {
       type: String,
-      unique: true,
       trim: true,
     },
     name: {
       type: String,
-      required: true,
       trim: true,
     },
     email: {
       type: String,
-      required: true,
       unique: true,
       trim: true,
     },
     contact: {
       type: String,
-      required: true,
       trim: true,
     },
     address: {
@@ -32,7 +28,6 @@ const customerSchema = new mongoose.Schema<ICustomer>(
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
     },
     tickets: [
       {

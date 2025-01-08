@@ -5,15 +5,14 @@ import { paginate } from "../plugins/paginate.plugin";
 const problemSchema = new mongoose.Schema<IProblem>(
   {
     type: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "InventoryType",
-          // required: true,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "InventoryType",
     },
     problem: {
       type: String,
       trim: true,
       required: true,
-    }
+    },
   },
   {
     timestamps: true,
