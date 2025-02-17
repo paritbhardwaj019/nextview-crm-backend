@@ -1,27 +1,40 @@
 import ApiError from "../utils/ApiError";
 import httpStatus from "../config/httpStatus";
-import config from "../config/config";
-import { Resend } from "resend";
-const resend = new Resend(config.resend.apiKey);
+import nodemailer from "nodemailer";
+
+const transporter = nodemailer.createTransport({
+  host: "smtp.hostinger.com",
+  port: 465,
+  secure: true,
+  auth: {
+    user: "no_reply@nextviewkavach.in",
+    pass: "b14ck-cyph3R",
+  },
+});
 
 class EmailService {
   /**
-   * Send email using Resend
+   * Send email using Hostinger SMTP
    * @param to - Recipient email
    * @param subject - Email subject
    * @param html - Email content in HTML
    */
-
   async sendEmail(to: string, subject: string, html: string) {
     try {
-      await resend.emails.send({
-        from: config.resend.fromEmail!,
+      const mailOptions = {
+        from: '"Nextview Kavach" <no_reply@nextviewkavach.in>',
         to,
         subject,
         html,
-      });
+        headers: {
+          Importance: "high",
+          Priority: "urgent",
+          "X-Priority": "1",
+        },
+      };
+
+      await transporter.sendMail(mailOptions);
     } catch (error) {
-      console.error("Error sending email:", error);
       throw new ApiError(
         httpStatus.INTERNAL_SERVER_ERROR,
         "Failed to send email"

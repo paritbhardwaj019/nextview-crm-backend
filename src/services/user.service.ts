@@ -42,10 +42,18 @@ class UserService {
       page: Number(page),
       limit: Number(limit),
       sort,
+      populate: [
+        {
+          path: "role",
+          populate: {
+            path: "permissions",
+            model: "Permission",
+          },
+        },
+      ],
     };
 
     const users = await User.paginate(query, options);
-
     return users;
   }
 
