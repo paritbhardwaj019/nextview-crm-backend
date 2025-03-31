@@ -2,13 +2,60 @@ const TicketSettings = require("../models/ticketSettings.model");
 const ApiError = require("../utils/apiError.util");
 const { ROLES } = require("../config/roles");
 
+const DEFAULT_SETTINGS = {
+  autoApproval: false,
+  autoApprovalRoles: [],
+  defaultAssignToSupportManager: false,
+  defaultDueDateDays: 7,
+  priorityDueDates: {
+    LOW: 10,
+    MEDIUM: 7,
+    HIGH: 3,
+    CRITICAL: 1,
+  },
+  notifyOnStatusChange: true,
+  allowReopenClosedTickets: true,
+  reopenWindowDays: 30,
+};
+
 class TicketSettingsService {
   /**
    * Get ticket system settings
    * @returns {Promise<Object>} - Settings data
    */
   static async getSettings() {
-    return await TicketSettings.getSingleton();
+    let settings = await TicketSettings.findOne();
+    if (!settings) {
+      // Create default settings if none exist
+      settings = await TicketSettings.create(DEFAULT_SETTINGS);
+    }
+
+    // Ensure priorityDueDates has all required keys
+    if (
+      !settings.priorityDueDates ||
+      typeof settings.priorityDueDates !== "object"
+    ) {
+      settings.priorityDueDates = { ...DEFAULT_SETTINGS.priorityDueDates };
+      await settings.save();
+    } else {
+      // Ensure all priorities exist
+      const priorities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+      let needsUpdate = false;
+
+      for (const priority of priorities) {
+        if (settings.priorityDueDates[priority] === undefined) {
+          settings.priorityDueDates[priority] =
+            DEFAULT_SETTINGS.priorityDueDates[priority];
+          needsUpdate = true;
+        }
+      }
+
+      if (needsUpdate) {
+        await settings.save();
+      }
+    }
+
+    return settings;
   }
 
   /**
@@ -41,14 +88,28 @@ class TicketSettingsService {
       }
     }
 
-    const settings = await TicketSettings.getSingleton();
+    const settings = await this.getSettings();
 
+    // Handle special case for priorityDueDates to ensure all keys remain
+    if (updateData.priorityDueDates) {
+      // Create a new object with existing values as a base
+      const updatedPriorityDueDates = { ...settings.priorityDueDates };
+
+      // Update only the keys provided in updateData
+      for (const [key, value] of Object.entries(updateData.priorityDueDates)) {
+        updatedPriorityDueDates[key] = value;
+      }
+
+      // Replace updateData.priorityDueDates with the complete object
+      updateData.priorityDueDates = updatedPriorityDueDates;
+    }
+
+    // Apply all updates
     Object.keys(updateData).forEach((key) => {
       settings[key] = updateData[key];
     });
 
     settings.updatedBy = userId;
-
     await settings.save();
 
     return settings;
@@ -67,21 +128,19 @@ class TicketSettingsService {
       );
     }
 
-    const settings = await TicketSettings.getSingleton();
+    const settings = await this.getSettings();
 
-    settings.autoApproval = false;
-    settings.autoApprovalRoles = [];
-    settings.defaultAssignToSupportManager = false;
-    settings.defaultDueDateDays = 7;
-    settings.priorityDueDates = {
-      LOW: 10,
-      MEDIUM: 7,
-      HIGH: 3,
-      CRITICAL: 1,
-    };
-    settings.notifyOnStatusChange = true;
-    settings.allowReopenClosedTickets = true;
-    settings.reopenWindowDays = 30;
+    // Update with default values
+    settings.autoApproval = DEFAULT_SETTINGS.autoApproval;
+    settings.autoApprovalRoles = DEFAULT_SETTINGS.autoApprovalRoles;
+    settings.defaultAssignToSupportManager =
+      DEFAULT_SETTINGS.defaultAssignToSupportManager;
+    settings.defaultDueDateDays = DEFAULT_SETTINGS.defaultDueDateDays;
+    settings.priorityDueDates = { ...DEFAULT_SETTINGS.priorityDueDates };
+    settings.notifyOnStatusChange = DEFAULT_SETTINGS.notifyOnStatusChange;
+    settings.allowReopenClosedTickets =
+      DEFAULT_SETTINGS.allowReopenClosedTickets;
+    settings.reopenWindowDays = DEFAULT_SETTINGS.reopenWindowDays;
     settings.updatedBy = userId;
 
     await settings.save();
@@ -105,7 +164,7 @@ class TicketSettingsService {
       );
     }
 
-    const settings = await TicketSettings.getSingleton();
+    const settings = await this.getSettings();
 
     settings.autoApproval = enabled;
 
@@ -114,7 +173,6 @@ class TicketSettingsService {
     }
 
     settings.updatedBy = userId;
-
     await settings.save();
 
     return settings;
@@ -125,11 +183,14 @@ class TicketSettingsService {
    * @returns {Promise<Object>} - Due dates configuration
    */
   static async getDueDatesConfig() {
-    const settings = await TicketSettings.getSingleton();
+    const settings = await this.getSettings();
 
     return {
-      defaultDueDateDays: settings.defaultDueDateDays,
-      priorityDueDates: settings.priorityDueDates,
+      defaultDueDateDays:
+        settings.defaultDueDateDays || DEFAULT_SETTINGS.defaultDueDateDays,
+      priorityDueDates: settings.priorityDueDates || {
+        ...DEFAULT_SETTINGS.priorityDueDates,
+      },
     };
   }
 
@@ -140,25 +201,30 @@ class TicketSettingsService {
    * @returns {Promise<Object>} - Updated settings
    */
   static async updateDueDatesConfig(dueDatesConfig, userId) {
-    const settings = await TicketSettings.getSingleton();
+    const settings = await this.getSettings();
 
     if (dueDatesConfig.defaultDueDateDays !== undefined) {
       settings.defaultDueDateDays = dueDatesConfig.defaultDueDateDays;
     }
 
     if (dueDatesConfig.priorityDueDates) {
-      const priorities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+      // Create a new object with existing values
+      const updatedPriorityDueDates = { ...settings.priorityDueDates };
 
+      // Update only the provided priority values
+      const priorities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
       for (const priority of priorities) {
         if (dueDatesConfig.priorityDueDates[priority] !== undefined) {
-          settings.priorityDueDates[priority] =
+          updatedPriorityDueDates[priority] =
             dueDatesConfig.priorityDueDates[priority];
         }
       }
+
+      // Replace with the complete updated object
+      settings.priorityDueDates = updatedPriorityDueDates;
     }
 
     settings.updatedBy = userId;
-
     await settings.save();
 
     return settings;

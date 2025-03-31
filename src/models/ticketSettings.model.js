@@ -51,6 +51,14 @@ const mongoose = require("mongoose");
  *           description: When settings were last updated
  */
 
+// Default values for ticket settings
+const DEFAULT_PRIORITY_DUE_DATES = {
+  LOW: 10,
+  MEDIUM: 7,
+  HIGH: 3,
+  CRITICAL: 1,
+};
+
 const ticketSettingsSchema = new mongoose.Schema(
   {
     autoApproval: {
@@ -75,13 +83,8 @@ const ticketSettingsSchema = new mongoose.Schema(
     },
     priorityDueDates: {
       type: Object,
-      default: {
-        LOW: 10,
-        MEDIUM: 7,
-        HIGH: 3,
-        CRITICAL: 1,
-      },
-      // The description should be in JSDoc or as a comment, not in the schema
+      default: () => ({ ...DEFAULT_PRIORITY_DUE_DATES }),
+      description: "Default due date days by priority",
     },
     notifyOnStatusChange: {
       type: Boolean,
@@ -105,6 +108,22 @@ const ticketSettingsSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Pre-save middleware to ensure priorityDueDates contains all required fields
+ticketSettingsSchema.pre("save", function (next) {
+  if (!this.priorityDueDates) {
+    this.priorityDueDates = { ...DEFAULT_PRIORITY_DUE_DATES };
+  } else {
+    // Ensure all priorities exist with default values if missing
+    const priorities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+    for (const priority of priorities) {
+      if (this.priorityDueDates[priority] === undefined) {
+        this.priorityDueDates[priority] = DEFAULT_PRIORITY_DUE_DATES[priority];
+      }
+    }
+  }
+  next();
+});
 
 ticketSettingsSchema.statics.getSingleton = async function () {
   let settings = await this.findOne();

@@ -19,6 +19,8 @@ class TicketController {
       category,
       search,
       assignedTo,
+      itemId,
+      serialNumber,
       startDate,
       endDate,
       sort = "-createdAt",
@@ -30,6 +32,8 @@ class TicketController {
     if (priority) query.priority = priority;
     if (category) query.category = category;
     if (assignedTo) query.assignedTo = assignedTo;
+    if (itemId) query.itemId = itemId;
+    if (serialNumber) query.serialNumber = serialNumber;
 
     if (startDate || endDate) {
       query.createdAt = {};
@@ -41,6 +45,8 @@ class TicketController {
       query.$or = [
         { title: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
+        { ticketId: { $regex: search, $options: "i" } },
+        { serialNumber: { $regex: search, $options: "i" } },
       ];
     }
 
@@ -64,6 +70,7 @@ class TicketController {
         { path: "createdBy", select: "name email" },
         { path: "assignedTo", select: "name email" },
         { path: "assignedBy", select: "name email" },
+        { path: "itemId", select: "name category sku" },
       ],
     };
 
@@ -106,7 +113,7 @@ class TicketController {
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "TICKET_VIEWED",
-      details: `Viewed ticket #${id} (${ticket.serialNumber})`,
+      details: `Viewed ticket: ${ticket.ticketId}`,
       ipAddress: req.ip,
     });
 
@@ -131,7 +138,7 @@ class TicketController {
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "TICKET_CREATED",
-      details: `Created new ticket: ${ticket.title}`,
+      details: `Created new ticket: ${ticket.title} (${ticket.ticketId})`,
       ipAddress: req.ip,
     });
 
@@ -157,7 +164,7 @@ class TicketController {
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "TICKET_UPDATED",
-      details: `Updated ticket #${id}: ${ticket.title}`,
+      details: `Updated ticket: ${ticket.title} (${ticket.ticketId})`,
       ipAddress: req.ip,
     });
 
@@ -165,7 +172,7 @@ class TicketController {
   });
 
   /**
-   * Assign ticket to a user with enhanced role tracking
+   * Assign ticket to a user
    * @route POST /api/tickets/:id/assign
    * @access Private
    */
@@ -188,7 +195,7 @@ class TicketController {
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "TICKET_ASSIGNED",
-      details: `Assigned ticket #${id} (${ticket.serialNumber}) to user ID: ${assignToUserId}`,
+      details: `Assigned ticket: ${ticket.ticketId} to user ID: ${assignToUserId}`,
       ipAddress: req.ip,
     });
 
@@ -229,7 +236,7 @@ class TicketController {
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "TICKET_APPROVED",
-      details: `Approved resolution for ticket #${id}`,
+      details: `Approved resolution for ticket: ${ticket.ticketId}`,
       ipAddress: req.ip,
     });
 
@@ -265,7 +272,7 @@ class TicketController {
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "COMMENT_ADDED",
-      details: `Added ${isInternal ? "internal " : ""}comment to ticket #${id}`,
+      details: `Added ${isInternal ? "internal " : ""}comment to ticket: ${ticket.ticketId}`,
       ipAddress: req.ip,
     });
 
@@ -298,11 +305,65 @@ class TicketController {
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "ATTACHMENTS_ADDED",
-      details: `Added ${attachments.length} attachment(s) to ticket #${id}`,
+      details: `Added ${attachments.length} attachment(s) to ticket: ${ticket.ticketId}`,
       ipAddress: req.ip,
     });
 
     return ApiResponse.success(res, "Attachments added successfully", ticket);
+  });
+
+  /**
+   * Get available serial numbers for an item
+   * @route GET /api/tickets/item/:itemId/serial-numbers
+   * @access Private
+   */
+  static getAvailableSerialNumbers = asyncHandler(async (req, res) => {
+    const { itemId } = req.params;
+
+    const result = await TicketService.getAvailableSerialNumbers(itemId);
+
+    return ApiResponse.success(
+      res,
+      "Available serial numbers retrieved successfully",
+      result
+    );
+  });
+
+  /**
+   * Get Excel headers for item mapping
+   * @route GET /api/tickets/item/:itemId/excel-headers
+   * @access Private
+   */
+  static getItemExcelHeaders = asyncHandler(async (req, res) => {
+    const { itemId } = req.params;
+
+    const headers = await TicketService.getItemExcelHeaders(itemId);
+
+    return ApiResponse.success(
+      res,
+      "Item Excel headers retrieved successfully",
+      headers
+    );
+  });
+
+  /**
+   * Get metadata for a specific serial number
+   * @route GET /api/tickets/item/:itemId/serial-number/:serialNumber/metadata
+   * @access Private
+   */
+  static getSerialNumberMetadata = asyncHandler(async (req, res) => {
+    const { itemId, serialNumber } = req.params;
+
+    const metadata = await TicketService.getSerialNumberMetadata(
+      itemId,
+      serialNumber
+    );
+
+    return ApiResponse.success(
+      res,
+      "Serial number metadata retrieved successfully",
+      metadata
+    );
   });
 }
 

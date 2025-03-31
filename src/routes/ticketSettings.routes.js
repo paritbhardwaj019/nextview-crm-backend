@@ -231,7 +231,7 @@ router.put(
   AuthMiddleware.authenticate,
   AuthMiddleware.requirePermission(PERMISSIONS.MANAGE_SETTINGS),
   auditMiddleware("TicketSettings"),
-  validateRequest(dueDatesConfigSchema),
+  // validateRequest(dueDatesConfigSchema),
   TicketSettingsController.updateDueDatesConfig
 );
 

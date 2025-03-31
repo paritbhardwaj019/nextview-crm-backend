@@ -85,6 +85,8 @@ class TicketSettingsController {
   static toggleAutoApproval = asyncHandler(async (req, res) => {
     const { enabled, roles } = req.body;
 
+    console.log(enabled, roles);
+
     const settings = await TicketSettingsService.toggleAutoApproval(
       enabled,
       roles,
