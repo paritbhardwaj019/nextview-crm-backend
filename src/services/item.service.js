@@ -19,6 +19,26 @@ class ItemService {
       delete queryObject.search;
     }
 
+    // Handle category filter
+    if (query.category) {
+      queryObject.category = query.category;
+    }
+
+    // Handle status filter
+    if (query.status) {
+      queryObject.status = query.status;
+    }
+
+    // Handle low stock filter
+    if (query.lowStock === "true") {
+      queryObject.$expr = { $lte: ["$quantity", "$notificationThreshold"] };
+    }
+
+    // Handle condition filter
+    if (query.condition) {
+      queryObject["inventory.condition"] = query.condition;
+    }
+
     return await Item.paginate(queryObject, options);
   }
 
@@ -26,7 +46,11 @@ class ItemService {
    * Get item by ID
    */
   static async getItemById(id) {
-    const item = await Item.findById(id);
+    const item = await Item.findById(id)
+      .populate("createdBy", "name email")
+      .populate("updatedBy", "name email")
+      .populate("inventory.updatedBy", "name email")
+      .populate("transactions.performedBy", "name email");
 
     if (!item) {
       throw ApiError.notFound("Item not found");
@@ -38,19 +62,28 @@ class ItemService {
   /**
    * Get all items for dropdown list (simplified data)
    */
-  static async getItemsForDropdown() {
-    const items = await Item.find({ status: "AVAILABLE" })
-      .select("_id name category sku")
+  static async getItemsForDropdown(withExcelData = false) {
+    let query = { status: "AVAILABLE" };
+
+    // If filtering for items with Excel data
+    if (withExcelData) {
+      query["uploadedFile.data"] = { $exists: true, $ne: [] };
+    }
+
+    const items = await Item.find(query)
+      .select(
+        "_id name category sku mainHeaderKey inventory notificationThreshold"
+      )
       .sort({ name: 1 });
 
     return items;
   }
 
   /**
-   * Create a new item
+   * Create a new item with inventory details
    */
   static async createItem(itemData, userId) {
-    const { name, sku } = itemData;
+    const { name, sku, inventory = [], notificationThreshold = 10 } = itemData;
 
     // Check if SKU already exists (if provided)
     if (sku) {
@@ -60,11 +93,45 @@ class ItemService {
       }
     }
 
+    // Calculate total quantity from inventory
+    const totalQuantity = inventory.reduce(
+      (total, stock) => total + (stock.quantity || 0),
+      0
+    );
+
+    // Create the item with inventory details
     const item = await Item.create({
       ...itemData,
+      quantity: totalQuantity,
+      inventory: inventory.map((stock) => ({
+        ...stock,
+        updatedBy: userId,
+        updatedAt: new Date(),
+      })),
+      notificationThreshold,
       createdBy: userId,
       updatedBy: userId,
     });
+
+    // Record initial inventory transactions if any inventory is added
+    if (inventory && inventory.length > 0) {
+      const transactions = inventory
+        .filter((stock) => stock.quantity > 0)
+        .map((stock) => ({
+          type: "INWARD",
+          condition: stock.condition,
+          quantity: stock.quantity,
+          reference: "Initial Stock",
+          notes: "Initial inventory setup",
+          performedBy: userId,
+          performedAt: new Date(),
+        }));
+
+      if (transactions.length > 0) {
+        item.transactions = transactions;
+        await item.save();
+      }
+    }
 
     return item;
   }
@@ -83,9 +150,49 @@ class ItemService {
       }
     }
 
-    // Update fields
+    // Handle inventory updates separately
+    if (updateData.inventory) {
+      // We don't replace the inventory array completely to preserve history
+      // Instead, we update existing entries or add new ones
+      updateData.inventory.forEach((stockUpdate) => {
+        const existingStockIndex = item.inventory.findIndex(
+          (stock) => stock.condition === stockUpdate.condition
+        );
+
+        if (existingStockIndex >= 0) {
+          // Update existing stock entry
+          item.inventory[existingStockIndex].quantity = stockUpdate.quantity;
+          item.inventory[existingStockIndex].location =
+            stockUpdate.location || item.inventory[existingStockIndex].location;
+          item.inventory[existingStockIndex].updatedBy = userId;
+          item.inventory[existingStockIndex].updatedAt = new Date();
+        } else {
+          // Add new stock entry
+          item.inventory.push({
+            condition: stockUpdate.condition,
+            quantity: stockUpdate.quantity,
+            location: stockUpdate.location,
+            updatedBy: userId,
+            updatedAt: new Date(),
+          });
+        }
+      });
+
+      // Recalculate total quantity
+      item.quantity = item.inventory.reduce(
+        (total, stock) => total + stock.quantity,
+        0
+      );
+
+      // Remove inventory from updateData to avoid overwriting our careful updates
+      delete updateData.inventory;
+    }
+
+    // Update other fields
     Object.keys(updateData).forEach((key) => {
-      item[key] = updateData[key];
+      if (key !== "inventory" && key !== "transactions") {
+        item[key] = updateData[key];
+      }
     });
 
     item.updatedBy = userId;
@@ -95,11 +202,152 @@ class ItemService {
   }
 
   /**
+   * Process inventory transaction (inward or outward)
+   */
+  static async processInventoryTransaction(id, transactionData, userId) {
+    const { type, condition, quantity, reference, notes } = transactionData;
+
+    if (!type || !condition || !quantity) {
+      throw ApiError.badRequest(
+        "Transaction type, condition, and quantity are required"
+      );
+    }
+
+    if (quantity <= 0) {
+      throw ApiError.badRequest("Transaction quantity must be positive");
+    }
+
+    const item = await this.getItemById(id);
+
+    // Find the inventory entry for this condition
+    let inventoryEntry = item.inventory.find(
+      (stock) => stock.condition === condition
+    );
+
+    // If entry doesn't exist, create it
+    if (!inventoryEntry) {
+      inventoryEntry = {
+        condition,
+        quantity: 0,
+        updatedBy: userId,
+        updatedAt: new Date(),
+      };
+      item.inventory.push(inventoryEntry);
+    }
+
+    // Process the transaction
+    const transaction = {
+      type,
+      condition,
+      quantity,
+      reference: reference || "",
+      notes: notes || "",
+      performedBy: userId,
+      performedAt: new Date(),
+    };
+
+    // Update inventory quantity
+    if (type === "INWARD") {
+      // For inward, we add to the quantity
+      inventoryEntry.quantity += quantity;
+    } else if (type === "OUTWARD") {
+      // For outward, we subtract from the quantity
+      if (inventoryEntry.quantity < quantity) {
+        throw ApiError.badRequest(
+          `Insufficient ${condition} inventory. Available: ${inventoryEntry.quantity}, Requested: ${quantity}`
+        );
+      }
+      inventoryEntry.quantity -= quantity;
+    } else {
+      throw ApiError.badRequest("Invalid transaction type");
+    }
+
+    // Update the timestamp and user
+    inventoryEntry.updatedBy = userId;
+    inventoryEntry.updatedAt = new Date();
+
+    // Recalculate total quantity
+    item.quantity = item.inventory.reduce(
+      (total, stock) => total + stock.quantity,
+      0
+    );
+
+    // Add transaction to history
+    item.transactions.push(transaction);
+
+    // Update status based on new total quantity
+    if (item.quantity === 0) {
+      item.status = "OUT_OF_STOCK";
+    } else {
+      item.status = "AVAILABLE";
+    }
+
+    await item.save();
+
+    return {
+      item,
+      transaction,
+    };
+  }
+
+  /**
+   * Get inventory transactions for an item
+   */
+  static async getInventoryTransactions(id, query = {}) {
+    const item = await this.getItemById(id);
+
+    let transactions = [...item.transactions];
+
+    // Sort by performedAt in descending order (newest first)
+    transactions.sort(
+      (a, b) => new Date(b.performedAt) - new Date(a.performedAt)
+    );
+
+    // Filter by type if specified
+    if (query.type) {
+      transactions = transactions.filter((t) => t.type === query.type);
+    }
+
+    // Filter by condition if specified
+    if (query.condition) {
+      transactions = transactions.filter(
+        (t) => t.condition === query.condition
+      );
+    }
+
+    // Filter by date range if specified
+    if (query.startDate && query.endDate) {
+      const startDate = new Date(query.startDate);
+      const endDate = new Date(query.endDate);
+      transactions = transactions.filter((t) => {
+        const performedDate = new Date(t.performedAt);
+        return performedDate >= startDate && performedDate <= endDate;
+      });
+    }
+
+    // Apply pagination
+    const page = parseInt(query.page) || 1;
+    const limit = parseInt(query.limit) || 10;
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
+
+    const paginatedTransactions = transactions.slice(startIndex, endIndex);
+
+    return {
+      total: transactions.length,
+      page,
+      limit,
+      totalPages: Math.ceil(transactions.length / limit),
+      data: paginatedTransactions,
+    };
+  }
+
+  /**
    * Delete an item
    */
   static async deleteItem(id) {
     const item = await this.getItemById(id);
-    await item.remove();
+    await item.deleteOne();
     return { success: true };
   }
 
@@ -112,17 +360,14 @@ class ItemService {
     }
 
     try {
-      // Read the file
       const workbook = XLSX.read(file.buffer, { type: "buffer" });
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
 
-      // Convert to JSON
       const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-      // Extract headers (first row) and data (remaining rows)
       const headers = data[0];
-      const rows = data.slice(1).filter((row) => row.length > 0); // Remove empty rows
+      const rows = data.slice(1).filter((row) => row.length > 0);
 
       if (!headers || headers.length === 0) {
         throw ApiError.badRequest("Invalid Excel file: No headers found");
@@ -132,7 +377,6 @@ class ItemService {
         throw ApiError.badRequest("Invalid Excel file: No data found");
       }
 
-      // Update the item with file data
       const item = await this.getItemById(id);
 
       item.uploadedFile = {
@@ -140,6 +384,10 @@ class ItemService {
         headers: headers,
         data: rows,
       };
+
+      if (item.mainHeaderKey && !headers.includes(item.mainHeaderKey)) {
+        item.mainHeaderKey = null;
+      }
 
       item.updatedBy = userId;
       await item.save();
@@ -153,6 +401,18 @@ class ItemService {
         "Error processing Excel file: " + error.message
       );
     }
+  }
+
+  /**
+   * Get items with low stock
+   */
+  static async getLowStockItems() {
+    const lowStockItems = await Item.find({
+      $expr: { $lte: ["$quantity", "$notificationThreshold"] },
+      status: { $ne: "DISCONTINUED" },
+    }).sort({ quantity: 1 });
+
+    return lowStockItems;
   }
 }
 

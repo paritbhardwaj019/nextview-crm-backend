@@ -17,7 +17,13 @@ const createUserSchema = Joi.object({
     "any.required": "Email is required",
   }),
   role: Joi.string()
-    .valid(ROLES.SUPER_ADMIN, ROLES.SUPPORT_MANAGER, ROLES.ENGINEER)
+    .valid(
+      ROLES.SUPER_ADMIN,
+      ROLES.SUPPORT_MANAGER,
+      ROLES.ENGINEER,
+      ROLES.DISPATCH_MANAGER,
+      ROLES.INVENTORY_MANAGER
+    )
     .required()
     .messages({
       "string.empty": "Role is required",

@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const { ROLES } = require("../config/roles");
 
 /**
  * @swagger
@@ -65,7 +66,13 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["SUPER_ADMIN", "SUPPORT_MANAGER", "ENGINEER"],
+      enum: [
+        ROLES.SUPER_ADMIN,
+        ROLES.SUPPORT_MANAGER,
+        ROLES.ENGINEER,
+        ROLES.DISPATCH_MANAGER,
+        ROLES.INVENTORY_MANAGER,
+      ],
       required: true,
     },
     name: {

@@ -6,11 +6,10 @@ const asyncHandler = require("../utils/asyncHandler.util");
 const multer = require("multer");
 const path = require("path");
 
-// Configure multer for file uploads
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (ext !== ".xlsx" && ext !== ".xls") {
@@ -31,6 +30,8 @@ class ItemController {
       search,
       category,
       status,
+      lowStock,
+      condition,
       sort = "-createdAt",
     } = req.query;
 
@@ -39,6 +40,8 @@ class ItemController {
     if (search) query.search = search;
     if (category) query.category = category;
     if (status) query.status = status;
+    if (lowStock) query.lowStock = lowStock;
+    if (condition) query.condition = condition;
 
     // Parse sort parameter
     const sortOptions = {};
@@ -101,7 +104,10 @@ class ItemController {
    * Get items for dropdown
    */
   static getItemsForDropdown = asyncHandler(async (req, res) => {
-    const items = await ItemService.getItemsForDropdown();
+    const { withExcelData } = req.query;
+    const items = await ItemService.getItemsForDropdown(
+      withExcelData === "true"
+    );
 
     return ApiResponse.success(
       res,
@@ -171,6 +177,60 @@ class ItemController {
   });
 
   /**
+   * Process inventory transaction (inward or outward)
+   */
+  static processInventoryTransaction = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const transactionData = req.body;
+    const userId = req.user.id;
+
+    const result = await ItemService.processInventoryTransaction(
+      id,
+      transactionData,
+      userId
+    );
+
+    const actionType =
+      transactionData.type === "INWARD" ? "received" : "dispatched";
+
+    await ActivityLogService.logActivity({
+      userId,
+      action: `INVENTORY_${transactionData.type}`,
+      details: `${actionType} ${transactionData.quantity} ${transactionData.condition} units of item: ${result.item.name}`,
+      ipAddress: req.ip,
+    });
+
+    return ApiResponse.success(
+      res,
+      `Inventory ${actionType} successfully`,
+      result
+    );
+  });
+
+  /**
+   * Get inventory transactions for an item
+   */
+  static getInventoryTransactions = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { page, limit, type, condition, startDate, endDate } = req.query;
+
+    const transactions = await ItemService.getInventoryTransactions(id, {
+      page,
+      limit,
+      type,
+      condition,
+      startDate,
+      endDate,
+    });
+
+    return ApiResponse.success(
+      res,
+      "Transactions retrieved successfully",
+      transactions
+    );
+  });
+
+  /**
    * Upload XLSX file for item
    */
   static uploadXlsxFile = asyncHandler(async (req, res) => {
@@ -231,6 +291,91 @@ class ItemController {
       headers: item.uploadedFile.headers,
       data: item.uploadedFile.data,
     });
+  });
+
+  /**
+   * Get Excel headers for an item
+   */
+  static getItemExcelHeaders = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    const item = await ItemService.getItemById(id);
+
+    if (!item.uploadedFile || !item.uploadedFile.headers) {
+      throw ApiError.notFound("No Excel headers found for this item");
+    }
+
+    return ApiResponse.success(res, "Excel headers retrieved successfully", {
+      headers: item.uploadedFile.headers,
+      currentMainHeader: item.mainHeaderKey || null,
+    });
+  });
+
+  /**
+   * Get Excel headers for dropdown selection
+   */
+  static getMainExcelHeaderForDropdown = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    const item = await ItemService.getItemById(id);
+
+    if (!item.uploadedFile || !item.uploadedFile.headers) {
+      throw ApiError.notFound("No Excel headers found for this item");
+    }
+
+    // Format headers for dropdown
+    const headers = item.uploadedFile.headers.map((header, index) => ({
+      label: header,
+      value: header,
+    }));
+
+    return ApiResponse.success(
+      res,
+      "Excel headers for dropdown retrieved successfully",
+      {
+        headers,
+        currentSelection: item.mainHeaderKey || null,
+      }
+    );
+  });
+
+  /**
+   * Check if item has Excel data
+   */
+  static checkExcelData = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    const item = await ItemService.getItemById(id);
+    const hasExcelData = !!(
+      item.uploadedFile &&
+      item.uploadedFile.data &&
+      item.uploadedFile.data.length > 0
+    );
+
+    return ApiResponse.success(res, "Excel data check completed", {
+      hasExcelData,
+      itemId: id,
+    });
+  });
+
+  /**
+   * Get items with low stock
+   */
+  static getLowStockItems = asyncHandler(async (req, res) => {
+    const lowStockItems = await ItemService.getLowStockItems();
+
+    await ActivityLogService.logActivity({
+      userId: req.user.id,
+      action: "LOW_STOCK_ITEMS_VIEWED",
+      details: `Retrieved list of low stock items`,
+      ipAddress: req.ip,
+    });
+
+    return ApiResponse.success(
+      res,
+      "Low stock items retrieved successfully",
+      lowStockItems
+    );
   });
 }
 
