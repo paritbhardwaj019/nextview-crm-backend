@@ -113,7 +113,7 @@ class TicketController {
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "TICKET_VIEWED",
-      details: `Viewed ticket: ${ticket.ticketId}`,
+      details: `Viewed ticket: ${ticket.ticketId || id}`,
       ipAddress: req.ip,
     });
 
@@ -121,28 +121,56 @@ class TicketController {
   });
 
   /**
-   * Create a new ticket
+   * Create a new ticket with file attachments
    * @route POST /api/tickets
    * @access Private
    */
   static createTicket = asyncHandler(async (req, res) => {
-    const ticketData = req.body;
+    const files = req.files || [];
 
-    const ticket = await TicketService.createTicket(
-      ticketData,
+    const ticket = await TicketService.createTicketWithFiles(
+      { ...req.body, files },
       req.user.id,
       req.user.role
     );
 
-    // Log activity
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "TICKET_CREATED",
-      details: `Created new ticket: ${ticket.title} (${ticket.ticketId})`,
+      details: `Created new ticket: ${ticket.title} (${ticket.ticketId || ticket._id})`,
       ipAddress: req.ip,
     });
 
     return ApiResponse.created(res, "Ticket created successfully", ticket);
+  });
+
+  /**
+   * Upload attachments to a ticket
+   * @route POST /api/tickets/:id/attachments
+   * @access Private
+   */
+  static addAttachments = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const files = req.files || [];
+
+    if (files.length === 0) {
+      throw ApiError.badRequest("No files were uploaded");
+    }
+
+    const ticket = await TicketService.addAttachments(
+      id,
+      { files },
+      req.user.id
+    );
+
+    await ActivityLogService.logActivity({
+      userId: req.user.id,
+      action: "ATTACHMENTS_ADDED",
+      details: `Added ${files.length} attachment(s) to ticket: ${ticket.ticketId || id}`,
+      ipAddress: req.ip,
+    });
+
+    return ApiResponse.success(res, "Attachments added successfully", ticket);
   });
 
   /**
@@ -164,7 +192,7 @@ class TicketController {
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "TICKET_UPDATED",
-      details: `Updated ticket: ${ticket.title} (${ticket.ticketId})`,
+      details: `Updated ticket: ${ticket.title} (${ticket.ticketId || ticket._id})`,
       ipAddress: req.ip,
     });
 
@@ -195,7 +223,7 @@ class TicketController {
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "TICKET_ASSIGNED",
-      details: `Assigned ticket: ${ticket.ticketId} to user ID: ${assignToUserId}`,
+      details: `Assigned ticket: ${ticket.ticketId || id} to user ID: ${assignToUserId}`,
       ipAddress: req.ip,
     });
 
@@ -236,7 +264,7 @@ class TicketController {
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "TICKET_APPROVED",
-      details: `Approved resolution for ticket: ${ticket.ticketId}`,
+      details: `Approved resolution for ticket: ${ticket.ticketId || id}`,
       ipAddress: req.ip,
     });
 
@@ -272,7 +300,7 @@ class TicketController {
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "COMMENT_ADDED",
-      details: `Added ${isInternal ? "internal " : ""}comment to ticket: ${ticket.ticketId}`,
+      details: `Added ${isInternal ? "internal " : ""}comment to ticket: ${ticket.ticketId || id}`,
       ipAddress: req.ip,
     });
 
@@ -305,11 +333,40 @@ class TicketController {
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "ATTACHMENTS_ADDED",
-      details: `Added ${attachments.length} attachment(s) to ticket: ${ticket.ticketId}`,
+      details: `Added ${attachments.length} attachment(s) to ticket: ${ticket.ticketId || id}`,
       ipAddress: req.ip,
     });
 
     return ApiResponse.success(res, "Attachments added successfully", ticket);
+  });
+
+  /**
+   * Delete an attachment from a ticket
+   * @route DELETE /api/tickets/:id/attachments/:attachmentId
+   * @access Private
+   */
+  static deleteAttachment = asyncHandler(async (req, res) => {
+    const { id, attachmentId } = req.params;
+
+    if (!attachmentId) {
+      throw ApiError.badRequest("Attachment ID is required");
+    }
+
+    const ticket = await TicketService.deleteAttachment(
+      id,
+      attachmentId,
+      req.user.id,
+      req.user.role
+    );
+
+    await ActivityLogService.logActivity({
+      userId: req.user.id,
+      action: "ATTACHMENT_DELETED",
+      details: `Deleted attachment from ticket: ${ticket.ticketId || id}`,
+      ipAddress: req.ip,
+    });
+
+    return ApiResponse.success(res, "Attachment deleted successfully", ticket);
   });
 
   /**
@@ -326,23 +383,6 @@ class TicketController {
       res,
       "Available serial numbers retrieved successfully",
       result
-    );
-  });
-
-  /**
-   * Get Excel headers for item mapping
-   * @route GET /api/tickets/item/:itemId/excel-headers
-   * @access Private
-   */
-  static getItemExcelHeaders = asyncHandler(async (req, res) => {
-    const { itemId } = req.params;
-
-    const headers = await TicketService.getItemExcelHeaders(itemId);
-
-    return ApiResponse.success(
-      res,
-      "Item Excel headers retrieved successfully",
-      headers
     );
   });
 

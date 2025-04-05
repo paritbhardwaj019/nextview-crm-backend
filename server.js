@@ -2,6 +2,7 @@ const app = require("./src/app");
 const config = require("./src/config/config");
 const mongoose = require("mongoose");
 const TicketSettings = require("./src/models/ticketSettings.model");
+const Role = require("./src/models/role.model");
 
 const PORT = config.app.port;
 
@@ -51,7 +52,6 @@ const seedTicketSettings = async () => {
         };
         needsUpdate = true;
       } else {
-        // Check each priority value
         const priorities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
         for (const priority of priorities) {
           if (existingSettings.priorityDueDates[priority] === undefined) {
@@ -83,14 +83,33 @@ const seedTicketSettings = async () => {
   }
 };
 
-// Connect to MongoDB, seed data, and start server
+const seedDefaultRoles = async () => {
+  try {
+    console.log("Initializing default roles...");
+
+    const existingRolesCount = await Role.countDocuments();
+
+    if (existingRolesCount === 0) {
+      console.log("No roles found. Creating default roles...");
+      await Role.createDefaultRoles();
+      console.log("Default roles created successfully!");
+    } else {
+      console.log(
+        `Found ${existingRolesCount} existing roles. Skipping default role creation.`
+      );
+    }
+  } catch (error) {
+    console.error("Error seeding default roles:", error);
+  }
+};
+
 mongoose
   .connect(config.db.uri, config.db.options)
   .then(async () => {
     console.log("Connected to MongoDB");
 
-    // Seed ticket settings
     await seedTicketSettings();
+    await seedDefaultRoles();
 
     // Start server after seeding
     const server = app.listen(PORT, () => {

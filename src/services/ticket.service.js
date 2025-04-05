@@ -1,9 +1,12 @@
 const Ticket = require("../models/ticket.model");
 const User = require("../models/user.model");
+const Item = require("../models/item.model");
 const TicketSettings = require("../models/ticketSettings.model");
 const ApiError = require("../utils/apiError.util");
 const { ROLES, PERMISSIONS, hasPermission } = require("../config/roles");
 const { notify } = require("./notification.service");
+const { uploadToCloudinary } = require("../middlewares/cloudinary.middleware");
+const Customer = require("../models/customer.model");
 
 class TicketService {
   /**
@@ -17,6 +20,12 @@ class TicketService {
   static async getAllTickets(query, options, userId, userRole) {
     const queryObject = { ...query };
 
+    // Add customer ID filter if provided
+    if (query.customerId) {
+      queryObject.customerId = query.customerId;
+    }
+
+    // Filter by access permissions based on user role
     if (userRole === ROLES.ENGINEER) {
       queryObject.$or = [{ assignedTo: userId }, { createdBy: userId }];
     } else if (userRole === ROLES.SUPPORT_MANAGER) {
@@ -34,7 +43,15 @@ class TicketService {
       ];
     }
 
-    return await Ticket.paginate(queryObject, options);
+    const updatedOptions = {
+      ...options,
+      populate: [
+        ...(options.populate || []),
+        { path: "customerId", select: "name mobile email" },
+      ],
+    };
+
+    return await Ticket.paginate(queryObject, updatedOptions);
   }
 
   /**
@@ -52,7 +69,8 @@ class TicketService {
       .populate("approvedBy", "name email role")
       .populate("resolvedBy", "name email role")
       .populate("closedBy", "name email role")
-      .populate("comments.createdBy", "name email role");
+      .populate("comments.createdBy", "name email role")
+      .populate("attachments.uploadedBy", "name email role");
 
     if (!ticket) {
       throw ApiError.notFound("Ticket not found");
@@ -90,17 +108,52 @@ class TicketService {
   }
 
   /**
-   * Create a new ticket
-   * @param {Object} ticketData - Ticket data
+   * Create a new ticket with file attachments and customer assignment
+   * @param {Object} formData - FormData containing ticket data and files
    * @param {String} userId - ID of the user creating the ticket
    * @param {String} userRole - Role of the user creating the ticket
    * @returns {Promise<Object>} - Created ticket data
    */
-  static async createTicket(ticketData, userId, userRole) {
+  static async createTicketWithFiles(formData, userId, userRole) {
     const settings = await TicketSettings.getSingleton();
 
+    // Validate customer
+    const customer = await Customer.findById(formData.customerId);
+    if (!customer) {
+      throw new ApiError(404, "Customer not found");
+    }
+    if (!customer.isActive) {
+      throw new ApiError(400, "Cannot create ticket for inactive customer");
+    }
+
+    const ticketData = {
+      title: formData.title,
+      description: formData.description,
+      priority: formData.priority || "MEDIUM",
+      category: formData.category || "OTHER",
+      ticketId: formData.ticketNumber,
+      itemId: formData.itemId || null,
+      serialNumber: formData.serialNumber || null,
+      dueDate: formData.dueDate || null,
+      problems: formData.problems ? JSON.parse(formData.problems) : [],
+      customerId: customer._id, // Add customer ID to ticket
+    };
+
+    if (ticketData.itemId) {
+      const item = await Item.findById(ticketData.itemId);
+      if (!item) {
+        throw ApiError.badRequest("Item not found");
+      }
+
+      if (!ticketData.serialNumber) {
+        throw ApiError.badRequest(
+          "Serial number is required when selecting an item"
+        );
+      }
+    }
+
     if (!ticketData.dueDate) {
-      const priority = ticketData.priority;
+      const priority = ticketData.priority || "MEDIUM";
       const daysToAdd =
         settings.priorityDueDates[priority] || settings.defaultDueDateDays;
 
@@ -112,7 +165,8 @@ class TicketService {
     let assignToData = {};
     if (
       settings.defaultAssignToSupportManager &&
-      userRole !== ROLES.SUPER_ADMIN
+      userRole !== ROLES.SUPER_ADMIN &&
+      userRole !== ROLES.SUPPORT_MANAGER
     ) {
       const supportManager = await User.findOne({
         role: ROLES.SUPPORT_MANAGER,
@@ -142,14 +196,134 @@ class TicketService {
       }
     }
 
+    // Create ticket with all data
     const ticket = await Ticket.create({
       ...ticketData,
       ...assignToData,
       createdBy: userId,
     });
 
+    // Update customer's ticket count and references
+    await customer.addTicket(ticket._id);
+
+    // Process attachments if any
+    if (formData.files && formData.files.length > 0) {
+      try {
+        const files = Array.isArray(formData.files)
+          ? formData.files
+          : [formData.files];
+
+        const uploadPromises = files.map(async (file) => {
+          if (file.cloudinaryUrl) {
+            return {
+              url: file.cloudinaryUrl,
+              filename: file.originalname,
+              mimeType: file.mimetype,
+              size: file.size,
+              uploadedBy: userId,
+              uploadedAt: new Date(),
+            };
+          }
+
+          const result = await uploadToCloudinary(file);
+
+          return {
+            url: result.secure_url,
+            filename: file.originalname,
+            mimeType: file.mimetype,
+            size: file.size,
+            uploadedBy: userId,
+            uploadedAt: new Date(),
+          };
+        });
+
+        const attachments = await Promise.all(uploadPromises);
+
+        ticket.attachments = attachments;
+        await ticket.save();
+      } catch (error) {
+        console.error("Error processing attachments:", error);
+      }
+    }
+
+    // Extract metadata if item and serial number provided
+    if (ticket.itemId && ticket.serialNumber) {
+      await ticket.extractItemMetadata();
+      await ticket.save();
+    }
+
+    // Send notification if ticket is assigned
     if (ticket.assignedTo) {
       await this.notifyTicketAssignment(ticket, userId);
+    }
+
+    // Notify customer about ticket creation
+    if (customer && customer.email) {
+      try {
+        await notify({
+          userId: userId, // The creator will be notified as a fallback
+          email: customer.email, // Direct email to customer
+          subject: `New Support Ticket Created: ${ticket.ticketId}`,
+          message: `Dear ${customer.name},\n\nA new support ticket has been created for you:\n\nTicket ID: ${ticket.ticketId}\nTitle: ${ticket.title}\nPriority: ${ticket.priority}\n\nWe'll be in touch with you soon regarding this matter.\n\nThank you for your patience.`,
+          notificationType: "TICKET_CREATED_CUSTOMER",
+        });
+      } catch (error) {
+        console.error("Failed to send customer notification:", error);
+      }
+    }
+
+    return ticket;
+  }
+
+  /**
+   * Get ticket by ID with customer data
+   * @param {String} id - Ticket ID
+   * @param {String} userId - ID of the user making the request
+   * @param {String} userRole - Role of the user making the request
+   * @returns {Promise<Object>} - Ticket data with customer
+   */
+  static async getTicketById(id, userId, userRole) {
+    const ticket = await Ticket.findById(id)
+      .populate("createdBy", "name email role")
+      .populate("assignedTo", "name email role")
+      .populate("assignedBy", "name email role")
+      .populate("approvedBy", "name email role")
+      .populate("resolvedBy", "name email role")
+      .populate("closedBy", "name email role")
+      .populate("comments.createdBy", "name email role")
+      .populate("attachments.uploadedBy", "name email role")
+      .populate("customerId", "name mobile email address city state pincode"); // Add customer population
+
+    if (!ticket) {
+      throw ApiError.notFound("Ticket not found");
+    }
+
+    if (userRole === ROLES.ENGINEER) {
+      if (
+        ticket.assignedTo?.toString() !== userId &&
+        ticket.createdBy.toString() !== userId
+      ) {
+        throw ApiError.forbidden(
+          "You do not have permission to view this ticket"
+        );
+      }
+    } else if (userRole === ROLES.SUPPORT_MANAGER) {
+      const engineersUnderManager = await User.find({
+        role: ROLES.ENGINEER,
+      }).select("_id");
+
+      const engineerIds = engineersUnderManager.map((e) => e._id.toString());
+
+      if (
+        ticket.assignedTo?.toString() !== userId &&
+        ticket.createdBy.toString() !== userId &&
+        !engineerIds.includes(ticket.assignedTo?.toString()) &&
+        ticket.status !== "PENDING_APPROVAL"
+      ) {
+        throw ApiError.forbidden(
+          "You do not have permission to view this ticket"
+        );
+      }
     }
 
     return ticket;
@@ -170,6 +344,51 @@ class TicketService {
       throw ApiError.notFound("Ticket not found");
     }
 
+    // Check permissions based on role
+    this.checkUpdatePermissions(ticket, updateData, userId, userRole);
+
+    // Handle status changes
+    if (updateData.status) {
+      updateData = this.handleStatusChange(ticket, updateData, userId);
+    }
+
+    // Handle attachments - merge with existing if provided
+    if (updateData.attachments && Array.isArray(updateData.attachments)) {
+      // Mark new attachments with the current user
+      const newAttachments = updateData.attachments.map((attachment) => ({
+        ...attachment,
+        uploadedBy: userId,
+        uploadedAt: new Date(),
+      }));
+
+      // Remove attachments property from updateData since we'll handle it separately
+      delete updateData.attachments;
+
+      // Add the new attachments to the existing ones
+      ticket.attachments.push(...newAttachments);
+    }
+
+    // Update other fields
+    Object.keys(updateData).forEach((key) => {
+      ticket[key] = updateData[key];
+    });
+
+    await ticket.save();
+
+    // Send notifications on status change
+    const settings = await TicketSettings.getSingleton();
+    if (settings.notifyOnStatusChange && updateData.status) {
+      await this.notifyStatusChange(ticket, userId);
+    }
+
+    return ticket;
+  }
+
+  /**
+   * Check if user has permission to update the ticket
+   * @private
+   */
+  static checkUpdatePermissions(ticket, updateData, userId, userRole) {
     if (userRole === ROLES.ENGINEER) {
       if (ticket.assignedTo?.toString() !== userId) {
         throw ApiError.forbidden(
@@ -196,7 +415,7 @@ class TicketService {
         ticket.assignedTo?.toString() !== userId &&
         ticket.createdBy.toString() !== userId
       ) {
-        const isEngineerUnderManager = await User.exists({
+        const isEngineerUnderManager = User.exists({
           _id: ticket.assignedTo,
           role: ROLES.ENGINEER,
         });
@@ -208,55 +427,122 @@ class TicketService {
         }
       }
     }
+  }
 
-    if (updateData.status) {
-      switch (updateData.status) {
-        case "RESOLVED":
-          updateData.resolvedBy = userId;
-          updateData.resolvedAt = new Date();
+  /**
+   * Handle status changes and related fields
+   * @private
+   */
+  static handleStatusChange(ticket, updateData, userId) {
+    switch (updateData.status) {
+      case "RESOLVED":
+        updateData.resolvedBy = userId;
+        updateData.resolvedAt = new Date();
 
-          const settings = await TicketSettings.getSingleton();
-          if (
-            !settings.autoApproval ||
-            !settings.autoApprovalRoles.includes(userRole)
-          ) {
-            updateData.status = "PENDING_APPROVAL";
-          }
-          break;
+        // Check if auto-approval is needed
+        const settings = TicketSettings.getSingleton();
+        if (
+          !settings.autoApproval ||
+          !settings.autoApprovalRoles.includes(userRole)
+        ) {
+          updateData.status = "PENDING_APPROVAL";
+        }
+        break;
 
-        case "CLOSED":
-          updateData.closedBy = userId;
-          updateData.closedAt = new Date();
-          break;
+      case "CLOSED":
+        updateData.closedBy = userId;
+        updateData.closedAt = new Date();
+        break;
 
-        case "REOPENED":
-          const ticketSettings = await TicketSettings.getSingleton();
-          if (!ticketSettings.allowReopenClosedTickets) {
-            throw ApiError.forbidden("Reopening closed tickets is not allowed");
-          }
+      case "REOPENED":
+        // Check if reopening is allowed
+        const ticketSettings = TicketSettings.getSingleton();
+        if (!ticketSettings.allowReopenClosedTickets) {
+          throw ApiError.forbidden("Reopening closed tickets is not allowed");
+        }
 
-          if (ticket.closedAt) {
-            const daysSinceClosure = Math.ceil(
-              (new Date() - new Date(ticket.closedAt)) / (1000 * 60 * 60 * 24)
+        if (ticket.closedAt) {
+          const daysSinceClosure = Math.ceil(
+            (new Date() - new Date(ticket.closedAt)) / (1000 * 60 * 60 * 24)
+          );
+
+          if (daysSinceClosure > ticketSettings.reopenWindowDays) {
+            throw ApiError.forbidden(
+              `Tickets can only be reopened within ${ticketSettings.reopenWindowDays} days of closure`
             );
-
-            if (daysSinceClosure > ticketSettings.reopenWindowDays) {
-              throw ApiError.forbidden(
-                `Tickets can only be reopened within ${ticketSettings.reopenWindowDays} days of closure`
-              );
-            }
           }
-          break;
-      }
+        }
+        break;
     }
 
-    Object.assign(ticket, updateData);
+    return updateData;
+  }
+
+  /**
+   * Delete an attachment from a ticket
+   * @param {String} ticketId - Ticket ID
+   * @param {String} attachmentId - Attachment ID
+   * @param {String} userId - ID of the user making the request
+   * @param {String} userRole - Role of the user making the request
+   * @returns {Promise<Object>} - Updated ticket data
+   */
+  static async deleteAttachment(ticketId, attachmentId, userId, userRole) {
+    const ticket = await Ticket.findById(ticketId);
+
+    if (!ticket) {
+      throw ApiError.notFound("Ticket not found");
+    }
+
+    // Check permissions
+    this.checkUpdatePermissions(ticket, {}, userId, userRole);
+
+    // Find the attachment
+    const attachmentIndex = ticket.attachments.findIndex(
+      (a) => a._id.toString() === attachmentId
+    );
+
+    if (attachmentIndex === -1) {
+      throw ApiError.notFound("Attachment not found");
+    }
+
+    // Remove the attachment
+    ticket.attachments.splice(attachmentIndex, 1);
     await ticket.save();
 
-    const settings = await TicketSettings.getSingleton();
-    if (settings.notifyOnStatusChange && updateData.status) {
-      await this.notifyStatusChange(ticket, userId);
+    return ticket;
+  }
+
+  /**
+   * Add attachments to a ticket
+   * @param {String} ticketId - Ticket ID
+   * @param {Array} attachments - Array of attachment objects with url and filename
+   * @param {String} userId - ID of the user adding attachments
+   * @returns {Promise<Object>} - Updated ticket data
+   */
+  static async addAttachments(ticketId, attachments, userId) {
+    const ticket = await Ticket.findById(ticketId);
+
+    if (!ticket) {
+      throw ApiError.notFound("Ticket not found");
     }
+
+    if (
+      !attachments ||
+      !Array.isArray(attachments) ||
+      attachments.length === 0
+    ) {
+      throw ApiError.badRequest("Attachments array is required");
+    }
+
+    // Format attachments with uploader info
+    const formattedAttachments = attachments.map((attachment) => ({
+      ...attachment,
+      uploadedBy: userId,
+      uploadedAt: new Date(),
+    }));
+
+    ticket.attachments.push(...formattedAttachments);
+    await ticket.save();
 
     return ticket;
   }
@@ -425,33 +711,6 @@ class TicketService {
 
     // Notify relevant parties about the new comment
     await this.notifyNewComment(ticket, commentData, userId);
-
-    return ticket;
-  }
-
-  /**
-   * Add attachments to a ticket
-   * @param {String} ticketId - Ticket ID
-   * @param {Array} attachments - Array of attachment objects with url and filename
-   * @param {String} userId - ID of the user adding attachments
-   * @returns {Promise<Object>} - Updated ticket data
-   */
-  static async addAttachments(ticketId, attachments, userId) {
-    const ticket = await Ticket.findById(ticketId);
-
-    if (!ticket) {
-      throw ApiError.notFound("Ticket not found");
-    }
-
-    // Format attachments with uploader info
-    const formattedAttachments = attachments.map((attachment) => ({
-      ...attachment,
-      uploadedBy: userId,
-      uploadedAt: new Date(),
-    }));
-
-    ticket.attachments.push(...formattedAttachments);
-    await ticket.save();
 
     return ticket;
   }
@@ -658,6 +917,65 @@ class TicketService {
           notificationType: "TICKET_COMMENT",
         });
       }
+    }
+  }
+
+  /**
+   * Add attachments to a ticket
+   * @param {String} ticketId - Ticket ID
+   * @param {Object} formData - FormData containing files
+   * @param {String} userId - ID of the user adding attachments
+   * @returns {Promise<Object>} - Updated ticket data
+   */
+  static async addAttachments(ticketId, formData, userId) {
+    const ticket = await Ticket.findById(ticketId);
+
+    if (!ticket) {
+      throw ApiError.notFound("Ticket not found");
+    }
+
+    if (!formData || !formData.files || formData.files.length === 0) {
+      throw ApiError.badRequest("Files are required");
+    }
+
+    try {
+      const files = Array.isArray(formData.files)
+        ? formData.files
+        : [formData.files];
+
+      const uploadPromises = files.map(async (file) => {
+        if (file.cloudinaryUrl) {
+          return {
+            url: file.cloudinaryUrl,
+            filename: file.originalname,
+            mimeType: file.mimetype,
+            size: file.size,
+            uploadedBy: userId,
+            uploadedAt: new Date(),
+          };
+        }
+
+        const result = await uploadToCloudinary(file);
+
+        return {
+          url: result.secure_url,
+          filename: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+          uploadedBy: userId,
+          uploadedAt: new Date(),
+        };
+      });
+
+      const attachments = await Promise.all(uploadPromises);
+
+      ticket.attachments.push(...attachments);
+      await ticket.save();
+
+      return ticket;
+    } catch (error) {
+      console.error("Error uploading files:", error);
+      throw ApiError.internal("Error uploading files to storage");
     }
   }
 }

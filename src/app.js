@@ -14,6 +14,8 @@ const ticketRoutes = require("./routes/ticket.routes");
 const ticketSettingsRoutes = require("./routes/ticketSettings.routes");
 const itemRoutes = require("./routes/item.routes");
 const problemRoutes = require("./routes/problem.routes");
+const roleRoutes = require("./routes/role.routes");
+const customerRoutes = require("./routes/customer.routes");
 // const installationRoutes = require("./routes/installationRoutes");
 // const itemRoutes = require("./routes/itemRoutes");
 // const settingsRoutes = require("./routes/settingsRoutes");
@@ -44,6 +46,8 @@ app.use(`${apiPrefix}/tickets`, ticketRoutes);
 app.use(`${apiPrefix}/settings/tickets`, ticketSettingsRoutes);
 app.use(`${config.app.apiPrefix}/items`, itemRoutes);
 app.use(`${config.app.apiPrefix}/problems`, problemRoutes);
+app.use(`${config.app.apiPrefix}/roles`, roleRoutes);
+app.use(`${config.app.apiPrefix}/customers`, customerRoutes);
 
 // app.use(`${apiPrefix}/installation-requests`, installationRoutes);
 // app.use(`${apiPrefix}/items`, itemRoutes);

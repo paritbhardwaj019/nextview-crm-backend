@@ -1,7 +1,8 @@
 const AuthService = require("../services/auth.service");
 const ApiError = require("../utils/apiError.util");
 const asyncHandler = require("../utils/asyncHandler.util");
-const { hasPermission } = require("../config/roles");
+const { hasPermission } = require("../config/permissions");
+const Role = require("../models/role.model");
 const User = require("../models/user.model");
 
 class AuthMiddleware {
@@ -35,17 +36,33 @@ class AuthMiddleware {
 
   static requirePermission(permission) {
     return asyncHandler(async (req, res, next) => {
-      const user = await User.findById(req.user.id);
+      try {
+        const user = await User.findById(req.user.id);
 
-      if (!user) {
-        throw ApiError.unauthorized("User not found");
+        if (!user) {
+          throw ApiError.unauthorized("User not found");
+        }
+
+        if (user.role === "SUPER_ADMIN") {
+          return next();
+        }
+
+        const userRole = await Role.findOne({ code: user.role });
+
+        if (!userRole) {
+          throw ApiError.forbidden(`Role not found: ${user.role}`);
+        }
+
+        if (!hasPermission(userRole.permissions, permission)) {
+          throw ApiError.forbidden(
+            `Insufficient permissions: ${permission} is required`
+          );
+        }
+
+        next();
+      } catch (error) {
+        next(error);
       }
-
-      if (!hasPermission(user.role, permission)) {
-        throw ApiError.forbidden("Insufficient permissions");
-      }
-
-      next();
     });
   }
 }

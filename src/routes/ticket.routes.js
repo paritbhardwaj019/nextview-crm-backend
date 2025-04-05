@@ -9,8 +9,17 @@ const {
   assignTicketSchema,
   commentSchema,
   attachmentsSchema,
+  processFileUploads,
 } = require("../validators/ticket.validator");
+const {
+  uploadTicketImage,
+  uploadTicketImages,
+  uploadTicketDocument,
+  uploadTicketDocuments,
+  handleTicketUploadError,
+} = require("../middlewares/upload.middleware");
 const auditMiddleware = require("../middlewares/audit.middleware");
+const { uploadToCloudinary } = require("../middlewares/cloudinary.middleware");
 
 const router = express.Router();
 
@@ -111,7 +120,7 @@ router.get(
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             required:
@@ -134,11 +143,13 @@ router.get(
  *               photos:
  *                 type: array
  *                 items:
- *                   type: object
- *               attachments:
+ *                   type: string
+ *                   format: binary
+ *               documents:
  *                 type: array
  *                 items:
- *                   type: object
+ *                   type: string
+ *                   format: binary
  *     responses:
  *       201:
  *         description: Ticket created successfully
@@ -151,8 +162,7 @@ router.post(
   "/",
   AuthMiddleware.authenticate,
   AuthMiddleware.requirePermission(PERMISSIONS.CREATE_TICKET),
-  auditMiddleware("Ticket"),
-  validateRequest(createTicketSchema),
+  uploadToCloudinary("files"),
   TicketController.createTicket
 );
 
@@ -175,7 +185,7 @@ router.post(
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
@@ -195,6 +205,16 @@ router.post(
  *               dueDate:
  *                 type: string
  *                 format: date-time
+ *               photos:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *               documents:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
  *     responses:
  *       200:
  *         description: Ticket updated successfully
@@ -212,6 +232,12 @@ router.put(
   AuthMiddleware.authenticate,
   AuthMiddleware.requirePermission(PERMISSIONS.UPDATE_TICKET),
   auditMiddleware("Ticket"),
+  uploadTicketImages,
+  handleTicketUploadError,
+  processFileUploads("photos"),
+  uploadTicketDocuments,
+  handleTicketUploadError,
+  processFileUploads("attachments"),
   validateRequest(updateTicketSchema),
   TicketController.updateTicket
 );
@@ -244,6 +270,9 @@ router.put(
  *               assignToUserId:
  *                 type: string
  *                 description: User ID to assign the ticket to
+ *               notes:
+ *                 type: string
+ *                 description: Optional notes about the assignment
  *     responses:
  *       200:
  *         description: Ticket assigned successfully
@@ -263,6 +292,37 @@ router.post(
   auditMiddleware("Ticket"),
   validateRequest(assignTicketSchema),
   TicketController.assignTicket
+);
+
+/**
+ * @swagger
+ * /api/tickets/{id}/assignment-history:
+ *   get:
+ *     summary: Get ticket assignment history
+ *     description: Retrieve the assignment history for a ticket.
+ *     tags: [Tickets]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Ticket ID
+ *     responses:
+ *       200:
+ *         description: Assignment history retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Ticket not found
+ */
+router.get(
+  "/:id/assignment-history",
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requirePermission(PERMISSIONS.VIEW_TICKET),
+  TicketController.getTicketAssignmentHistory
 );
 
 /**
@@ -318,7 +378,7 @@ router.post(
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             required:
@@ -329,10 +389,11 @@ router.post(
  *               isInternal:
  *                 type: boolean
  *                 default: false
- *               attachments:
+ *               documents:
  *                 type: array
  *                 items:
- *                   type: object
+ *                   type: string
+ *                   format: binary
  *     responses:
  *       200:
  *         description: Comment added successfully
@@ -347,6 +408,9 @@ router.post(
   "/:id/comments",
   AuthMiddleware.authenticate,
   AuthMiddleware.requirePermission(PERMISSIONS.UPDATE_TICKET),
+  uploadTicketDocuments,
+  handleTicketUploadError,
+  processFileUploads("attachments"),
   validateRequest(commentSchema),
   TicketController.addComment
 );
@@ -370,28 +434,17 @@ router.post(
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             required:
- *               - attachments
+ *               - documents
  *             properties:
- *               attachments:
+ *               documents:
  *                 type: array
  *                 items:
- *                   type: object
- *                   required:
- *                     - url
- *                     - filename
- *                   properties:
- *                     url:
- *                       type: string
- *                     filename:
- *                       type: string
- *                     mimeType:
- *                       type: string
- *                     size:
- *                       type: number
+ *                   type: string
+ *                   format: binary
  *     responses:
  *       200:
  *         description: Attachments added successfully
@@ -406,15 +459,117 @@ router.post(
   "/:id/attachments",
   AuthMiddleware.authenticate,
   AuthMiddleware.requirePermission(PERMISSIONS.UPDATE_TICKET),
-  validateRequest(attachmentsSchema),
+  uploadTicketDocuments,
+  handleTicketUploadError,
+  processFileUploads("attachments"),
   TicketController.addAttachments
 );
 
+/**
+ * @swagger
+ * /api/tickets/{id}/attachments/{attachmentId}:
+ *   delete:
+ *     summary: Delete attachment from ticket
+ *     description: Remove an attachment from a ticket.
+ *     tags: [Tickets]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Ticket ID
+ *       - in: path
+ *         name: attachmentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Attachment ID
+ *     responses:
+ *       200:
+ *         description: Attachment deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Ticket or attachment not found
+ */
+router.delete(
+  "/:id/attachments/:attachmentId",
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requirePermission(PERMISSIONS.UPDATE_TICKET),
+  TicketController.deleteAttachment
+);
+
+/**
+ * @swagger
+ * /api/tickets/item/{itemId}/serial-numbers:
+ *   get:
+ *     summary: Get available serial numbers for an item
+ *     description: Retrieve all available serial numbers for a specific item.
+ *     tags: [Tickets]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: itemId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Item ID
+ *     responses:
+ *       200:
+ *         description: Serial numbers retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Item not found
+ */
 router.get(
-  "/:id/assignment-history",
+  "/item/:itemId/serial-numbers",
   AuthMiddleware.authenticate,
   AuthMiddleware.requirePermission(PERMISSIONS.VIEW_TICKET),
-  TicketController.getTicketAssignmentHistory
+  TicketController.getAvailableSerialNumbers
+);
+
+/**
+ * @swagger
+ * /api/tickets/item/{itemId}/serial-number/{serialNumber}/metadata:
+ *   get:
+ *     summary: Get metadata for a serial number
+ *     description: Retrieve metadata for a specific item and serial number combination.
+ *     tags: [Tickets]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: itemId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Item ID
+ *       - in: path
+ *         name: serialNumber
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Serial Number
+ *     responses:
+ *       200:
+ *         description: Metadata retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Item or serial number not found
+ */
+router.get(
+  "/item/:itemId/serial-number/:serialNumber/metadata",
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requirePermission(PERMISSIONS.VIEW_TICKET),
+  TicketController.getSerialNumberMetadata
 );
 
 module.exports = router;

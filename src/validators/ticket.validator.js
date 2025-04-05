@@ -28,8 +28,14 @@ const createTicketSchema = Joi.object({
       "any.only":
         "Category must be one of: HARDWARE, SOFTWARE, NETWORK, ACCOUNT, OTHER",
     }),
-  serialNumber: Joi.string().messages({
-    "string.empty": "Serial Number is required",
+  itemId: Joi.string().allow(null, ""),
+  serialNumber: Joi.string().when("itemId", {
+    is: Joi.exist().not(null, ""),
+    then: Joi.string().required().messages({
+      "string.empty": "Serial Number is required when an item is selected",
+      "any.required": "Serial Number is required when an item is selected",
+    }),
+    otherwise: Joi.string().allow(null, ""),
   }),
   dueDate: Joi.date().iso().min("now").allow(null).messages({
     "date.base": "Due date must be a valid date",
@@ -87,8 +93,14 @@ const updateTicketSchema = Joi.object({
       "any.only":
         "Category must be one of: HARDWARE, SOFTWARE, NETWORK, ACCOUNT, OTHER",
     }),
-  serialNumber: Joi.string().messages({
-    "string.empty": "Serial Number cannot be empty",
+  itemId: Joi.string().allow(null, ""),
+  serialNumber: Joi.string().when("itemId", {
+    is: Joi.exist().not(null, ""),
+    then: Joi.string().required().messages({
+      "string.empty": "Serial Number is required when an item is selected",
+      "any.required": "Serial Number is required when an item is selected",
+    }),
+    otherwise: Joi.string().allow(null, ""),
   }),
   status: Joi.string()
     .valid(
@@ -107,6 +119,16 @@ const updateTicketSchema = Joi.object({
   dueDate: Joi.date().iso().allow(null).messages({
     "date.base": "Due date must be a valid date",
   }),
+  attachments: Joi.array().items(
+    Joi.object({
+      url: Joi.string().uri().messages({
+        "string.uri": "Attachment URL must be a valid URL",
+      }),
+      filename: Joi.string(),
+      mimeType: Joi.string(),
+      size: Joi.number().integer().positive(),
+    })
+  ),
 }).unknown(true); // Allow unknown fields
 
 /**
@@ -170,10 +192,73 @@ const attachmentsSchema = Joi.object({
     }),
 }).unknown(true); // Allow unknown fields
 
+/**
+ * Function to format file uploads from Multer into the structure expected by the service
+ * @param {Object} req - Express request object
+ * @param {Array|File} files - Uploaded files from Multer
+ * @param {String} type - Type of file ('photo', 'document')
+ * @returns {Array} - Formatted file objects
+ */
+const formatFileUploads = (req, files, type = "attachment") => {
+  if (!files) return [];
+
+  // If files is an array (multiple files)
+  if (Array.isArray(files)) {
+    return files.map((file) => ({
+      url: file.path,
+      filename: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      uploadedBy: req.user.id,
+      uploadedAt: new Date(),
+    }));
+  }
+
+  // If files is a single file object
+  return [
+    {
+      url: files.path,
+      filename: files.originalname,
+      mimeType: files.mimetype,
+      size: files.size,
+      uploadedBy: req.user.id,
+      uploadedAt: new Date(),
+    },
+  ];
+};
+
+/**
+ * Middleware to process uploaded files and add them to the request body
+ * @param {String} fieldName - Field name to add the formatted files to in the request body
+ * @returns {Function} - Express middleware
+ */
+const processFileUploads = (fieldName = "attachments") => {
+  return (req, res, next) => {
+    if (!req.file && !req.files) return next();
+
+    const files = req.file || req.files;
+    const formattedFiles = formatFileUploads(req, files);
+
+    if (!req.body[fieldName]) {
+      req.body[fieldName] = formattedFiles;
+    } else if (Array.isArray(req.body[fieldName])) {
+      // If the field already exists as array, append to it
+      req.body[fieldName] = [...req.body[fieldName], ...formattedFiles];
+    } else {
+      // If the field exists but is not an array, convert to array and append
+      req.body[fieldName] = [req.body[fieldName], ...formattedFiles];
+    }
+
+    next();
+  };
+};
+
 module.exports = {
   createTicketSchema,
   updateTicketSchema,
   assignTicketSchema,
   commentSchema,
   attachmentsSchema,
+  formatFileUploads,
+  processFileUploads,
 };
