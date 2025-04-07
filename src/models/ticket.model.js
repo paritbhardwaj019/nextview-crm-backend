@@ -207,6 +207,10 @@ const ticketSchema = new mongoose.Schema(
         ],
       },
     ],
+    modelNumber: {
+      type: String,
+      trim: true,
+    },
   },
   { timestamps: true }
 );

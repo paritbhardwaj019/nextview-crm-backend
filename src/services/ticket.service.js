@@ -45,10 +45,7 @@ class TicketService {
 
     const updatedOptions = {
       ...options,
-      populate: [
-        ...(options.populate || []),
-        { path: "customerId", select: "name mobile email" },
-      ],
+      populate: [...(options.populate || [])],
     };
 
     return await Ticket.paginate(queryObject, updatedOptions);
@@ -117,7 +114,6 @@ class TicketService {
   static async createTicketWithFiles(formData, userId, userRole) {
     const settings = await TicketSettings.getSingleton();
 
-    // Validate customer
     const customer = await Customer.findById(formData.customerId);
     if (!customer) {
       throw new ApiError(404, "Customer not found");
@@ -134,9 +130,10 @@ class TicketService {
       ticketId: formData.ticketNumber,
       itemId: formData.itemId || null,
       serialNumber: formData.serialNumber || null,
+      modelNumber: formData.modelNumber || null,
       dueDate: formData.dueDate || null,
       problems: formData.problems ? JSON.parse(formData.problems) : [],
-      customerId: customer._id, // Add customer ID to ticket
+      customerId: customer._id,
     };
 
     if (ticketData.itemId) {
@@ -330,9 +327,9 @@ class TicketService {
   }
 
   /**
-   * Update ticket
+   * Update ticket with enhanced form data handling
    * @param {String} id - Ticket ID
-   * @param {Object} updateData - Data to update
+   * @param {Object} updateData - Data to update, can be FormData or regular object
    * @param {String} userId - ID of the user making the update
    * @param {String} userRole - Role of the user making the update
    * @returns {Promise<Object>} - Updated ticket data
@@ -347,41 +344,187 @@ class TicketService {
     // Check permissions based on role
     this.checkUpdatePermissions(ticket, updateData, userId, userRole);
 
-    // Handle status changes
-    if (updateData.status) {
-      updateData = this.handleStatusChange(ticket, updateData, userId);
-    }
+    // Create a clean update object
+    const cleanUpdate = {};
 
-    // Handle attachments - merge with existing if provided
-    if (updateData.attachments && Array.isArray(updateData.attachments)) {
-      // Mark new attachments with the current user
-      const newAttachments = updateData.attachments.map((attachment) => ({
-        ...attachment,
-        uploadedBy: userId,
-        uploadedAt: new Date(),
-      }));
+    // Process form fields
+    // Basic text fields
+    const textFields = [
+      "title",
+      "description",
+      "priority",
+      "category",
+      "status",
+      "serialNumber",
+      "modelNumber",
+    ];
 
-      // Remove attachments property from updateData since we'll handle it separately
-      delete updateData.attachments;
-
-      // Add the new attachments to the existing ones
-      ticket.attachments.push(...newAttachments);
-    }
-
-    // Update other fields
-    Object.keys(updateData).forEach((key) => {
-      ticket[key] = updateData[key];
+    textFields.forEach((field) => {
+      if (updateData[field] !== undefined) {
+        cleanUpdate[field] = updateData[field];
+      }
     });
 
+    // Process references
+    if (updateData.customerId) {
+      cleanUpdate.customerId = updateData.customerId;
+    }
+
+    if (updateData.itemId) {
+      cleanUpdate.itemId = updateData.itemId;
+    }
+
+    // Handle date fields
+    if (updateData.dueDate) {
+      try {
+        cleanUpdate.dueDate = new Date(updateData.dueDate);
+      } catch (e) {
+        console.error("Invalid date format:", e);
+      }
+    }
+
+    // Handle status changes
+    if (cleanUpdate.status) {
+      this.applyStatusChange(ticket, cleanUpdate, userId);
+    }
+
+    // Process problems array - might be JSON string in FormData
+    if (updateData.problems) {
+      try {
+        // If it's a string (from FormData), parse it
+        if (typeof updateData.problems === "string") {
+          cleanUpdate.problems = JSON.parse(updateData.problems);
+        } else {
+          cleanUpdate.problems = updateData.problems;
+        }
+      } catch (e) {
+        console.error("Error parsing problems array:", e);
+      }
+    }
+
+    // Process attachments to delete - might be JSON string in FormData
+    if (updateData.attachmentsToDelete) {
+      let attachmentsToDelete;
+
+      try {
+        // If it's a string (from FormData), parse it
+        if (typeof updateData.attachmentsToDelete === "string") {
+          attachmentsToDelete = JSON.parse(updateData.attachmentsToDelete);
+        } else {
+          attachmentsToDelete = updateData.attachmentsToDelete;
+        }
+
+        if (
+          Array.isArray(attachmentsToDelete) &&
+          attachmentsToDelete.length > 0
+        ) {
+          // Remove attachments that should be deleted
+          ticket.attachments = ticket.attachments.filter(
+            (attachment) =>
+              !attachmentsToDelete.includes(attachment._id.toString())
+          );
+        }
+      } catch (e) {
+        console.error("Error processing attachments to delete:", e);
+      }
+    }
+
+    // Process new file attachments
+    if (
+      updateData.files &&
+      Array.isArray(updateData.files) &&
+      updateData.files.length > 0
+    ) {
+      try {
+        const uploadPromises = updateData.files.map(async (file) => {
+          // If the file already has a URL (pre-processed)
+          if (file.cloudinaryUrl) {
+            return {
+              url: file.cloudinaryUrl,
+              filename: file.originalname || "file",
+              mimeType: file.mimetype,
+              size: file.size,
+              uploadedBy: userId,
+              uploadedAt: new Date(),
+            };
+          }
+
+          // Otherwise, upload to cloud storage
+          const result = await uploadToCloudinary(file);
+
+          return {
+            url: result.secure_url,
+            filename: file.originalname || "file",
+            mimeType: file.mimetype,
+            size: file.size,
+            uploadedBy: userId,
+            uploadedAt: new Date(),
+          };
+        });
+
+        const newAttachments = await Promise.all(uploadPromises);
+
+        // Add the new attachments to the existing ones
+        ticket.attachments.push(...newAttachments);
+      } catch (error) {
+        console.error("Error processing file attachments:", error);
+      }
+    }
+
+    // Update fields on the ticket
+    Object.keys(cleanUpdate).forEach((key) => {
+      ticket[key] = cleanUpdate[key];
+    });
+
+    // Save the ticket
     await ticket.save();
 
-    // Send notifications on status change
-    const settings = await TicketSettings.getSingleton();
-    if (settings.notifyOnStatusChange && updateData.status) {
-      await this.notifyStatusChange(ticket, userId);
+    // Send notifications on status change if needed
+    if (cleanUpdate.status) {
+      const settings = await TicketSettings.getSingleton();
+      if (settings.notifyOnStatusChange) {
+        await this.notifyStatusChange(ticket, userId);
+      }
     }
 
     return ticket;
+  }
+
+  /**
+   * Apply status change side effects like setting resolvedBy, closedBy, etc.
+   * @private
+   */
+  static applyStatusChange(ticket, updateData, userId) {
+    switch (updateData.status) {
+      case "RESOLVED":
+        updateData.resolvedBy = userId;
+        updateData.resolvedAt = new Date();
+        break;
+
+      case "CLOSED":
+        updateData.closedBy = userId;
+        updateData.closedAt = new Date();
+        break;
+
+      case "PENDING_APPROVAL":
+        break;
+
+      case "REOPENED":
+        ticket.closedBy = undefined;
+        ticket.closedAt = undefined;
+        break;
+
+      case "IN_PROGRESS":
+        if (!ticket.assignedTo) {
+          updateData.assignedTo = userId;
+          updateData.assignedBy = userId;
+          updateData.assignedAt = new Date();
+        }
+        break;
+
+      default:
+        break;
+    }
   }
 
   /**

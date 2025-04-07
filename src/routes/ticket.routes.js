@@ -205,16 +205,17 @@ router.post(
  *               dueDate:
  *                 type: string
  *                 format: date-time
- *               photos:
+ *               files:
  *                 type: array
  *                 items:
  *                   type: string
  *                   format: binary
- *               documents:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: binary
+ *               problems:
+ *                 type: string
+ *                 description: JSON string of problem IDs
+ *               attachmentsToDelete:
+ *                 type: string
+ *                 description: JSON string of attachment IDs to delete
  *     responses:
  *       200:
  *         description: Ticket updated successfully
@@ -232,13 +233,7 @@ router.put(
   AuthMiddleware.authenticate,
   AuthMiddleware.requirePermission(PERMISSIONS.UPDATE_TICKET),
   auditMiddleware("Ticket"),
-  uploadTicketImages,
-  handleTicketUploadError,
-  processFileUploads("photos"),
-  uploadTicketDocuments,
-  handleTicketUploadError,
-  processFileUploads("attachments"),
-  validateRequest(updateTicketSchema),
+  uploadToCloudinary("files"),
   TicketController.updateTicket
 );
 

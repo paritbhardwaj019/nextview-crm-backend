@@ -50,7 +50,6 @@ class TicketController {
       ];
     }
 
-    // Parse sort parameter
     const sortOptions = {};
     const sortFields = sort.split(",");
 
@@ -71,6 +70,10 @@ class TicketController {
         { path: "assignedTo", select: "name email" },
         { path: "assignedBy", select: "name email" },
         { path: "itemId", select: "name category sku" },
+        {
+          path: "customerId",
+          populate: { path: "createdBy", select: "name email" },
+        },
       ],
     };
 
@@ -180,7 +183,15 @@ class TicketController {
    */
   static updateTicket = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const updateData = req.body;
+
+    console.log("TICKET_UPDATE", req.body);
+
+    const files = req.files || [];
+
+    const updateData = {
+      ...req.body,
+      files,
+    };
 
     const ticket = await TicketService.updateTicket(
       id,
@@ -196,6 +207,7 @@ class TicketController {
       ipAddress: req.ip,
     });
 
+    // Return successful response
     return ApiResponse.success(res, "Ticket updated successfully", ticket);
   });
 
