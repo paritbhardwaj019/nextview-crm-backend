@@ -17,6 +17,7 @@ const problemRoutes = require("./routes/problem.routes");
 const roleRoutes = require("./routes/role.routes");
 const customerRoutes = require("./routes/customer.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
+const loggingRoutes = require("./routes/logging.routes");
 // const installationRoutes = require("./routes/installationRoutes");
 // const itemRoutes = require("./routes/itemRoutes");
 // const settingsRoutes = require("./routes/settingsRoutes");
@@ -49,7 +50,7 @@ app.use(`${config.app.apiPrefix}/problems`, problemRoutes);
 app.use(`${config.app.apiPrefix}/roles`, roleRoutes);
 app.use(`${config.app.apiPrefix}/customers`, customerRoutes);
 app.use(`${config.app.apiPrefix}/dashboard`, dashboardRoutes);
-
+app.use(`${config.app.apiPrefix}/logs`, loggingRoutes);
 // app.use(`${apiPrefix}/installation-requests`, installationRoutes);
 // app.use(`${apiPrefix}/items`, itemRoutes);
 // app.use(`${apiPrefix}/settings`, settingsRoutes);
