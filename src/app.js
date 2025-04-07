@@ -16,6 +16,7 @@ const itemRoutes = require("./routes/item.routes");
 const problemRoutes = require("./routes/problem.routes");
 const roleRoutes = require("./routes/role.routes");
 const customerRoutes = require("./routes/customer.routes");
+const dashboardRoutes = require("./routes/dashboard.routes");
 // const installationRoutes = require("./routes/installationRoutes");
 // const itemRoutes = require("./routes/itemRoutes");
 // const settingsRoutes = require("./routes/settingsRoutes");
@@ -39,15 +40,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(config.app.env === "development" ? "dev" : "combined"));
 
-const apiPrefix = config.app.apiPrefix;
-app.use(`${apiPrefix}/auth`, authRoutes);
-app.use(`${apiPrefix}/users`, userRoutes);
-app.use(`${apiPrefix}/tickets`, ticketRoutes);
-app.use(`${apiPrefix}/settings/tickets`, ticketSettingsRoutes);
+app.use(`${config.app.apiPrefix}/auth`, authRoutes);
+app.use(`${config.app.apiPrefix}/users`, userRoutes);
+app.use(`${config.app.apiPrefix}/tickets`, ticketRoutes);
+app.use(`${config.app.apiPrefix}/settings/tickets`, ticketSettingsRoutes);
 app.use(`${config.app.apiPrefix}/items`, itemRoutes);
 app.use(`${config.app.apiPrefix}/problems`, problemRoutes);
 app.use(`${config.app.apiPrefix}/roles`, roleRoutes);
 app.use(`${config.app.apiPrefix}/customers`, customerRoutes);
+app.use(`${config.app.apiPrefix}/dashboard`, dashboardRoutes);
 
 // app.use(`${apiPrefix}/installation-requests`, installationRoutes);
 // app.use(`${apiPrefix}/items`, itemRoutes);
