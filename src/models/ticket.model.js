@@ -43,7 +43,13 @@ const ticketSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["SERVICE", "INSTALLATION"],
+      enum: [
+        "SERVICE",
+        "INSTALLATION",
+        "CHARGEABLE",
+        "IN_WARRANTY",
+        "OUT_OF_WARRANTY",
+      ],
       required: [true, "Ticket type is required"],
       default: "SERVICE",
     },
