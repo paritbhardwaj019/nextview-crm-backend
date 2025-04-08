@@ -20,12 +20,14 @@ class TicketService {
   static async getAllTickets(query, options, userId, userRole) {
     const queryObject = { ...query };
 
-    // Add customer ID filter if provided
+    if (query.type) {
+      queryObject.type = query.type;
+    }
+
     if (query.customerId) {
       queryObject.customerId = query.customerId;
     }
 
-    // Filter by access permissions based on user role
     if (userRole === ROLES.ENGINEER) {
       queryObject.$or = [{ assignedTo: userId }, { createdBy: userId }];
     } else if (userRole === ROLES.SUPPORT_MANAGER) {
@@ -134,6 +136,7 @@ class TicketService {
       dueDate: formData.dueDate || null,
       problems: formData.problems ? JSON.parse(formData.problems) : [],
       customerId: customer._id,
+      type: formData.type || "SERVICE",
     };
 
     if (ticketData.itemId) {
@@ -357,6 +360,7 @@ class TicketService {
       "status",
       "serialNumber",
       "modelNumber",
+      "type",
     ];
 
     textFields.forEach((field) => {

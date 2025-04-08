@@ -21,6 +21,7 @@ class TicketController {
       assignedTo,
       itemId,
       serialNumber,
+      type,
       startDate,
       endDate,
       sort = "-createdAt",
@@ -34,6 +35,8 @@ class TicketController {
     if (assignedTo) query.assignedTo = assignedTo;
     if (itemId) query.itemId = itemId;
     if (serialNumber) query.serialNumber = serialNumber;
+    if (type) query.type = type;
+    if (req.user.role === "ENGINEER") query.assignedTo = req.user.id;
 
     if (startDate || endDate) {
       query.createdAt = {};

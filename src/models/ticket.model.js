@@ -41,7 +41,12 @@ const ticketSchema = new mongoose.Schema(
       ],
       default: "OPEN",
     },
-    // Item details
+    type: {
+      type: String,
+      enum: ["SERVICE", "INSTALLATION"],
+      required: [true, "Ticket type is required"],
+      default: "SERVICE",
+    },
     itemId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Item",
@@ -341,6 +346,7 @@ ticketSchema.index({ ticketId: 1 }, { unique: true });
 ticketSchema.index({ itemId: 1 });
 ticketSchema.index({ serialNumber: 1 });
 ticketSchema.index({ customerId: 1 });
+ticketSchema.index({ type: 1 });
 
 // Virtual for calculating age of ticket in days
 ticketSchema.virtual("ageInDays").get(function () {
