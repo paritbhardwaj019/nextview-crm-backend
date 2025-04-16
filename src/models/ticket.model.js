@@ -38,6 +38,7 @@ const ticketSchema = new mongoose.Schema(
         "RESOLVED",
         "CLOSED",
         "REOPENED",
+        "CLOSED_BY_CUSTOMER",
       ],
       default: "OPEN",
     },
@@ -222,6 +223,49 @@ const ticketSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    // Track all changes made to the ticket
+    history: [
+      {
+        action: {
+          type: String,
+          enum: [
+            "CREATED",
+            "UPDATED",
+            "STATUS_CHANGED",
+            "ASSIGNED",
+            "COMMENT_ADDED",
+            "ATTACHMENT_ADDED",
+            "ATTACHMENT_REMOVED",
+          ],
+          required: true,
+        },
+        performedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        timestamp: {
+          type: Date,
+          default: Date.now,
+        },
+        comment: {
+          type: String,
+          required: true,
+        },
+        changes: {
+          type: Object,
+          default: {},
+        },
+        // For changes that involve field updates
+        fieldChanges: [
+          {
+            field: String,
+            oldValue: mongoose.Schema.Types.Mixed,
+            newValue: mongoose.Schema.Types.Mixed,
+          },
+        ],
+      },
+    ],
   },
   { timestamps: true }
 );

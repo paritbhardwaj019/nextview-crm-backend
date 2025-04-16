@@ -123,6 +123,11 @@ const customerSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    source: {
+      type: String,
+      enum: ["manual", "import", "api"],
+      default: "manual",
+    },
     ticketCount: {
       type: Number,
       default: 0,

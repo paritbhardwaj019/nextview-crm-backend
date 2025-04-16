@@ -3,6 +3,7 @@ const { ActivityLogService } = require("../services/logging.service");
 const ApiResponse = require("../utils/apiResponse.util");
 const ApiError = require("../utils/apiError.util");
 const asyncHandler = require("../utils/asyncHandler.util");
+const Ticket = require("../models/ticket.model");
 
 class TicketController {
   /**
@@ -203,10 +204,20 @@ class TicketController {
       req.user.role
     );
 
+    // Log different activity based on status change
+    let activityAction = "TICKET_UPDATED";
+    let activityDetails = `Updated ticket: ${ticket.title} (${ticket.ticketId || ticket._id})`;
+
+    // Check if status was changed to CLOSED_BY_CUSTOMER
+    if (updateData.status === "CLOSED_BY_CUSTOMER") {
+      activityAction = "TICKET_CLOSED_BY_CUSTOMER";
+      activityDetails = `Ticket closed by customer: ${ticket.title} (${ticket.ticketId || ticket._id})`;
+    }
+
     await ActivityLogService.logActivity({
       userId: req.user.id,
-      action: "TICKET_UPDATED",
-      details: `Updated ticket: ${ticket.title} (${ticket.ticketId || ticket._id})`,
+      action: activityAction,
+      details: activityDetails,
       ipAddress: req.ip,
     });
 
@@ -418,6 +429,152 @@ class TicketController {
       res,
       "Serial number metadata retrieved successfully",
       metadata
+    );
+  });
+
+  /**
+   * Get ticket count by date and type
+   * @route GET /api/tickets/count-by-date-type
+   * @access Private
+   */
+  static getTicketCountByDateAndType = asyncHandler(async (req, res) => {
+    const { date, type } = req.query;
+
+    if (!date || !type) {
+      throw new ApiError(400, "Date and type are required");
+    }
+
+    const startDate = new Date(date);
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = new Date(date);
+    endDate.setHours(23, 59, 59, 999);
+
+    const count = await Ticket.countDocuments({
+      createdAt: { $gte: startDate, $lte: endDate },
+      type: type,
+    });
+
+    await ActivityLogService.logActivity({
+      userId: req.user.id,
+      action: "TICKET_COUNT_VIEWED",
+      details: `Retrieved ticket count for date: ${date} and type: ${type}`,
+      ipAddress: req.ip,
+    });
+
+    return ApiResponse.success(res, "Ticket count retrieved successfully", {
+      count,
+    });
+  });
+
+  /**
+   * Get ticket history
+   * @route GET /api/tickets/:id/history
+   * @access Private
+   */
+  static getTicketHistory = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+
+    const ticket = await Ticket.findById(id).populate({
+      path: "history.performedBy",
+      select: "name email",
+    });
+
+    if (!ticket) {
+      throw new ApiError(404, "Ticket not found");
+    }
+
+    // Get total count
+    const totalHistory = ticket.history.length;
+
+    // Calculate pagination
+    const startIdx = (parseInt(page) - 1) * parseInt(limit);
+    const endIdx = startIdx + parseInt(limit);
+
+    // Sort by timestamp descending (newest first) and apply pagination
+    const paginatedHistory = ticket.history
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(startIdx, endIdx);
+
+    // Create pagination metadata
+    const pagination = {
+      total: totalHistory,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      pages: Math.ceil(totalHistory / parseInt(limit)),
+    };
+
+    await ActivityLogService.logActivity({
+      userId: req.user.id,
+      action: "TICKET_HISTORY_VIEWED",
+      details: `Viewed history for ticket: ${ticket.ticketId || id}`,
+      ipAddress: req.ip,
+    });
+
+    return ApiResponse.withPagination(
+      res,
+      "Ticket history retrieved successfully",
+      paginatedHistory,
+      pagination
+    );
+  });
+
+  /**
+   * Close a ticket by customer
+   * @route POST /api/tickets/:id/close-by-customer
+   * @access Private
+   */
+  static closeTicketByCustomer = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    // Set up the update data - only what we need to change
+    const updateData = {
+      status: "CLOSED_BY_CUSTOMER",
+      closedBy: req.user.id,
+      closedAt: new Date(),
+    };
+
+    // Get the ticket first
+    const ticket = await Ticket.findById(id);
+
+    if (!ticket) {
+      throw ApiError.notFound("Ticket not found");
+    }
+
+    // Update the ticket with CLOSED_BY_CUSTOMER status
+    const updatedTicket = await Ticket.findByIdAndUpdate(id, updateData, {
+      new: true,
+    }).populate([
+      { path: "createdBy", select: "name email" },
+      { path: "assignedTo", select: "name email" },
+      { path: "customerId", select: "name mobile email" },
+    ]);
+
+    // Add a comment with the reason if provided
+    if (reason) {
+      await TicketService.addComment(
+        id,
+        `Ticket closed by customer. Reason: ${reason}`,
+        false, // Not internal
+        [], // No attachments
+        req.user.id
+      );
+    }
+
+    // Log the activity
+    await ActivityLogService.logActivity({
+      userId: req.user.id,
+      action: "TICKET_CLOSED_BY_CUSTOMER",
+      details: `Ticket closed by customer: ${updatedTicket.title} (${updatedTicket.ticketId || id})${reason ? ` - Reason: ${reason}` : ""}`,
+      ipAddress: req.ip,
+    });
+
+    return ApiResponse.success(
+      res,
+      "Ticket closed by customer successfully",
+      updatedTicket
     );
   });
 }

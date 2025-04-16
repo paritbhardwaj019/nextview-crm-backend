@@ -48,6 +48,10 @@ const inventoryTransactionSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  docketNumber: {
+    type: String,
+    trim: true,
+  },
   performedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",

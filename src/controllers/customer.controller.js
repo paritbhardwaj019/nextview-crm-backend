@@ -19,6 +19,7 @@ class CustomerController {
       city,
       sort = "-createdAt",
       isActive,
+      source,
     } = req.query;
 
     const query = {};
@@ -27,6 +28,7 @@ class CustomerController {
     if (state) query.state = state;
     if (city) query.city = city;
     if (isActive !== undefined) query.isActive = isActive === "true";
+    if (source) query.source = source;
 
     // Parse sort parameter
     const sortOptions = {};

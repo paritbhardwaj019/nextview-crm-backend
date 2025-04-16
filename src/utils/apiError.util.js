@@ -1,39 +1,49 @@
+/**
+ * Custom API Error class for handling API-specific errors
+ */
 class ApiError extends Error {
-  constructor(message, statusCode = 500, errors = []) {
+  /**
+   * Create a new API Error
+   * @param {number} statusCode - HTTP status code
+   * @param {string} message - Error message
+   * @param {Array} [errors] - Additional error details
+   */
+  constructor(statusCode, message, errors = []) {
     super(message);
     this.statusCode = statusCode;
     this.errors = errors;
+    this.name = "ApiError";
     this.status = `${statusCode}`.startsWith("4") ? "fail" : "error";
 
     Error.captureStackTrace(this, this.constructor);
   }
 
   static badRequest(message, errors = []) {
-    return new ApiError(message || "Bad request", 400, errors);
+    return new ApiError(400, message || "Bad request", errors);
   }
 
   static unauthorized(message, errors = []) {
-    return new ApiError(message || "Unauthorized access", 401, errors);
+    return new ApiError(401, message || "Unauthorized access", errors);
   }
 
   static forbidden(message, errors = []) {
-    return new ApiError(message || "Forbidden access", 403, errors);
+    return new ApiError(403, message || "Forbidden access", errors);
   }
 
   static notFound(message, errors = []) {
-    return new ApiError(message || "Resource not found", 404, errors);
+    return new ApiError(404, message || "Resource not found", errors);
   }
 
   static conflict(message, errors = []) {
-    return new ApiError(message || "Resource conflict", 409, errors);
+    return new ApiError(409, message || "Resource conflict", errors);
   }
 
   static validationError(message, errors = []) {
-    return new ApiError(message || "Validation failed", 422, errors);
+    return new ApiError(422, message || "Validation failed", errors);
   }
 
   static internal(message, errors = []) {
-    return new ApiError(message || "Internal server error", 500, errors);
+    return new ApiError(500, message || "Internal server error", errors);
   }
 
   static fromJoiError(joiError) {

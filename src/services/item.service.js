@@ -205,7 +205,8 @@ class ItemService {
    * Process inventory transaction (inward or outward)
    */
   static async processInventoryTransaction(id, transactionData, userId) {
-    const { type, condition, quantity, reference, notes } = transactionData;
+    const { type, condition, quantity, reference, notes, docketNumber } =
+      transactionData;
 
     if (!type || !condition || !quantity) {
       throw ApiError.badRequest(
@@ -245,6 +246,11 @@ class ItemService {
       performedBy: userId,
       performedAt: new Date(),
     };
+
+    // Add docket number if provided for outward transactions
+    if (type === "OUTWARD" && docketNumber) {
+      transaction.docketNumber = docketNumber;
+    }
 
     // Update inventory quantity
     if (type === "INWARD") {

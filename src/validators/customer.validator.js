@@ -48,6 +48,7 @@ const customerSchema = Joi.object({
     "string.email": "Please provide a valid email address",
   }),
   isActive: Joi.boolean().default(true),
+  source: Joi.string().valid("manual", "imported").default("manual"),
 });
 
 /**
@@ -84,6 +85,7 @@ const customerUpdateSchema = Joi.object({
     "string.email": "Please provide a valid email address",
   }),
   isActive: Joi.boolean(),
+  source: Joi.string().valid("manual", "imported"),
 });
 
 module.exports = {

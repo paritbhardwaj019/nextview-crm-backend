@@ -7,6 +7,7 @@ const { ROLES, PERMISSIONS, hasPermission } = require("../config/roles");
 const { notify } = require("./notification.service");
 const { uploadToCloudinary } = require("../middlewares/cloudinary.middleware");
 const Customer = require("../models/customer.model");
+const NotificationService = require("./notification.service");
 
 class TicketService {
   /**
@@ -116,6 +117,11 @@ class TicketService {
   static async createTicketWithFiles(formData, userId, userRole) {
     const settings = await TicketSettings.getSingleton();
 
+    // Validate that initial comment is provided
+    if (!formData.initialComment) {
+      throw new ApiError(400, "Initial comment is required");
+    }
+
     const customer = await Customer.findById(formData.customerId);
     if (!customer) {
       throw new ApiError(404, "Customer not found");
@@ -196,11 +202,30 @@ class TicketService {
       }
     }
 
+    // Initialize comments array with the initial comment
+    const initialComment = {
+      comment: formData.initialComment,
+      createdBy: userId,
+      createdAt: new Date(),
+      isInternal: false,
+    };
+
+    // Initialize history array with the creation record
+    const initialHistory = {
+      action: "CREATED",
+      performedBy: userId,
+      timestamp: new Date(),
+      comment: formData.initialComment,
+      changes: { ...ticketData },
+    };
+
     // Create ticket with all data
     const ticket = await Ticket.create({
       ...ticketData,
       ...assignToData,
       createdBy: userId,
+      comments: [initialComment],
+      history: [initialHistory],
     });
 
     // Update customer's ticket count and references
@@ -240,6 +265,19 @@ class TicketService {
         const attachments = await Promise.all(uploadPromises);
 
         ticket.attachments = attachments;
+
+        // Add attachment history entry
+        const attachmentHistory = {
+          action: "ATTACHMENT_ADDED",
+          performedBy: userId,
+          timestamp: new Date(),
+          comment: "Initial attachments added",
+          changes: {
+            attachments: attachments.map((a) => a.filename).join(", "),
+          },
+        };
+
+        ticket.history.push(attachmentHistory);
         await ticket.save();
       } catch (error) {
         console.error("Error processing attachments:", error);
@@ -344,53 +382,58 @@ class TicketService {
       throw ApiError.notFound("Ticket not found");
     }
 
-    // Check permissions based on role
+    // Require update comment
+    if (!updateData.updateComment) {
+      throw ApiError.badRequest("Update comment is required");
+    }
+
+    // Check if user has permissions to update this ticket
     this.checkUpdatePermissions(ticket, updateData, userId, userRole);
 
-    // Create a clean update object
-    const cleanUpdate = {};
+    // Check if we need to change status
+    const statusChanged =
+      updateData.status && updateData.status !== ticket.status;
 
-    // Process form fields
-    // Basic text fields
-    const textFields = [
-      "title",
-      "description",
-      "priority",
-      "category",
-      "status",
-      "serialNumber",
-      "modelNumber",
-      "type",
+    // Create a copy of the ticket for tracking changes
+    const oldTicket = JSON.parse(JSON.stringify(ticket.toObject()));
+
+    // Apply status changes based on rules - this will modify updateData
+    if (statusChanged) {
+      this.applyStatusChange(ticket, updateData, userId);
+    }
+
+    // Remove non-ticket fields from updateData
+    const cleanUpdate = { ...updateData };
+    const fieldsToRemove = [
+      "files",
+      "attachmentsToDelete",
+      "updateComment", // Our custom field that doesn't go into the ticket
     ];
 
-    textFields.forEach((field) => {
-      if (updateData[field] !== undefined) {
-        cleanUpdate[field] = updateData[field];
-      }
+    fieldsToRemove.forEach((field) => {
+      delete cleanUpdate[field];
     });
 
-    // Process references
-    if (updateData.customerId) {
-      cleanUpdate.customerId = updateData.customerId;
-    }
+    // Track what fields were changed
+    const fieldChanges = [];
 
-    if (updateData.itemId) {
-      cleanUpdate.itemId = updateData.itemId;
-    }
-
-    // Handle date fields
-    if (updateData.dueDate) {
-      try {
-        cleanUpdate.dueDate = new Date(updateData.dueDate);
-      } catch (e) {
-        console.error("Invalid date format:", e);
+    // Prepare to track changes
+    Object.keys(cleanUpdate).forEach((key) => {
+      if (
+        key !== "comments" &&
+        key !== "attachments" &&
+        key !== "assignmentHistory"
+      ) {
+        // Only track if values are different
+        if (JSON.stringify(ticket[key]) !== JSON.stringify(cleanUpdate[key])) {
+          fieldChanges.push({
+            field: key,
+            oldValue: ticket[key],
+            newValue: cleanUpdate[key],
+          });
+        }
       }
-    }
-
-    // Handle status changes
-    if (cleanUpdate.status) {
-      this.applyStatusChange(ticket, cleanUpdate, userId);
-    }
+    });
 
     // Process problems array - might be JSON string in FormData
     if (updateData.problems) {
@@ -400,6 +443,18 @@ class TicketService {
           cleanUpdate.problems = JSON.parse(updateData.problems);
         } else {
           cleanUpdate.problems = updateData.problems;
+        }
+
+        // Track changes to problems if different
+        if (
+          JSON.stringify(ticket.problems) !==
+          JSON.stringify(cleanUpdate.problems)
+        ) {
+          fieldChanges.push({
+            field: "problems",
+            oldValue: ticket.problems || [],
+            newValue: cleanUpdate.problems,
+          });
         }
       } catch (e) {
         console.error("Error parsing problems array:", e);
@@ -422,6 +477,27 @@ class TicketService {
           Array.isArray(attachmentsToDelete) &&
           attachmentsToDelete.length > 0
         ) {
+          // Get details of attachments being deleted for history
+          const deletedAttachments = ticket.attachments
+            .filter((a) => attachmentsToDelete.includes(a._id.toString()))
+            .map((a) => ({ id: a._id.toString(), name: a.filename }));
+
+          // Add history entry for attachment removal
+          if (deletedAttachments.length > 0) {
+            const attachmentHistoryEntry = {
+              action: "ATTACHMENT_REMOVED",
+              performedBy: userId,
+              timestamp: new Date(),
+              comment: updateData.updateComment,
+              changes: {
+                removedAttachments: deletedAttachments
+                  .map((a) => a.name)
+                  .join(", "),
+              },
+            };
+            ticket.history.push(attachmentHistoryEntry);
+          }
+
           // Remove attachments that should be deleted
           ticket.attachments = ticket.attachments.filter(
             (attachment) =>
@@ -470,6 +546,18 @@ class TicketService {
 
         // Add the new attachments to the existing ones
         ticket.attachments.push(...newAttachments);
+
+        // Add history entry for adding attachments
+        const attachmentHistoryEntry = {
+          action: "ATTACHMENT_ADDED",
+          performedBy: userId,
+          timestamp: new Date(),
+          comment: updateData.updateComment,
+          changes: {
+            addedAttachments: newAttachments.map((a) => a.filename).join(", "),
+          },
+        };
+        ticket.history.push(attachmentHistoryEntry);
       } catch (error) {
         console.error("Error processing file attachments:", error);
       }
@@ -480,11 +568,38 @@ class TicketService {
       ticket[key] = cleanUpdate[key];
     });
 
+    // Add a comment about the update if there were changes
+    if (
+      fieldChanges.length > 0 ||
+      updateData.files ||
+      updateData.attachmentsToDelete
+    ) {
+      const commentData = {
+        comment: updateData.updateComment,
+        isInternal: true, // System-generated update comments are internal
+        createdBy: userId,
+        createdAt: new Date(),
+      };
+
+      ticket.comments.push(commentData);
+
+      // Add history entry for the update
+      const historyEntry = {
+        action: statusChanged ? "STATUS_CHANGED" : "UPDATED",
+        performedBy: userId,
+        timestamp: new Date(),
+        comment: updateData.updateComment,
+        fieldChanges: fieldChanges,
+      };
+
+      ticket.history.push(historyEntry);
+    }
+
     // Save the ticket
     await ticket.save();
 
     // Send notifications on status change if needed
-    if (cleanUpdate.status) {
+    if (statusChanged) {
       const settings = await TicketSettings.getSingleton();
       if (settings.notifyOnStatusChange) {
         await this.notifyStatusChange(ticket, userId);
@@ -510,6 +625,11 @@ class TicketService {
         updateData.closedAt = new Date();
         break;
 
+      case "CLOSED_BY_CUSTOMER":
+        updateData.closedBy = userId;
+        updateData.closedAt = new Date();
+        break;
+
       case "PENDING_APPROVAL":
         break;
 
@@ -529,6 +649,7 @@ class TicketService {
       default:
         break;
     }
+    return updateData;
   }
 
   /**
@@ -662,36 +783,91 @@ class TicketService {
   /**
    * Add attachments to a ticket
    * @param {String} ticketId - Ticket ID
-   * @param {Array} attachments - Array of attachment objects with url and filename
+   * @param {Object} formData - FormData containing files
    * @param {String} userId - ID of the user adding attachments
    * @returns {Promise<Object>} - Updated ticket data
    */
-  static async addAttachments(ticketId, attachments, userId) {
+  static async addAttachments(ticketId, formData, userId) {
     const ticket = await Ticket.findById(ticketId);
 
     if (!ticket) {
       throw ApiError.notFound("Ticket not found");
     }
 
-    if (
-      !attachments ||
-      !Array.isArray(attachments) ||
-      attachments.length === 0
-    ) {
-      throw ApiError.badRequest("Attachments array is required");
+    if (!formData || !formData.files || formData.files.length === 0) {
+      throw ApiError.badRequest("Files are required");
     }
 
-    // Format attachments with uploader info
-    const formattedAttachments = attachments.map((attachment) => ({
-      ...attachment,
-      uploadedBy: userId,
-      uploadedAt: new Date(),
-    }));
+    // Require comment for the attachment
+    if (!formData.comment) {
+      throw ApiError.badRequest(
+        "Comment explaining the attachments is required"
+      );
+    }
 
-    ticket.attachments.push(...formattedAttachments);
-    await ticket.save();
+    try {
+      const files = Array.isArray(formData.files)
+        ? formData.files
+        : [formData.files];
 
-    return ticket;
+      const uploadPromises = files.map(async (file) => {
+        if (file.cloudinaryUrl) {
+          return {
+            url: file.cloudinaryUrl,
+            filename: file.originalname,
+            mimeType: file.mimetype,
+            size: file.size,
+            uploadedBy: userId,
+            uploadedAt: new Date(),
+          };
+        }
+
+        const result = await uploadToCloudinary(file);
+
+        return {
+          url: result.secure_url,
+          filename: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+          uploadedBy: userId,
+          uploadedAt: new Date(),
+        };
+      });
+
+      const attachments = await Promise.all(uploadPromises);
+
+      ticket.attachments.push(...attachments);
+
+      // Add a comment about the attachments
+      const commentData = {
+        comment: formData.comment,
+        createdBy: userId,
+        createdAt: new Date(),
+        isInternal: formData.isInternal || false,
+      };
+
+      ticket.comments.push(commentData);
+
+      // Add history entry for attachment added
+      const historyEntry = {
+        action: "ATTACHMENT_ADDED",
+        performedBy: userId,
+        timestamp: new Date(),
+        comment: formData.comment,
+        changes: {
+          attachments: attachments.map((a) => a.filename).join(", "),
+        },
+      };
+
+      ticket.history.push(historyEntry);
+
+      await ticket.save();
+
+      return ticket;
+    } catch (error) {
+      console.error("Error uploading files:", error);
+      throw ApiError.internal("Error uploading files to storage");
+    }
   }
 
   /**
@@ -716,35 +892,35 @@ class TicketService {
       throw ApiError.notFound("Ticket not found");
     }
 
-    const assignToUser = await User.findOne({
-      _id: assignToUserId,
-      isActive: true,
-    });
-
+    // Verify the user being assigned exists and is active
+    const assignToUser = await User.findById(assignToUserId);
     if (!assignToUser) {
-      throw ApiError.badRequest("User to assign not found or inactive");
+      throw ApiError.notFound("User to assign ticket to not found");
     }
 
-    if (userRole === ROLES.SUPER_ADMIN) {
-      if (
-        assignToUser.role !== ROLES.SUPPORT_MANAGER &&
-        assignToUser.role !== ROLES.ENGINEER
-      ) {
-        throw ApiError.badRequest(
-          "Super Admin can only assign tickets to Support Managers or Engineers"
-        );
-      }
-    } else if (userRole === ROLES.SUPPORT_MANAGER) {
-      // Support Manager can only assign to Engineers
-      if (assignToUser.role !== ROLES.ENGINEER) {
-        throw ApiError.forbidden(
-          "Support Managers can only assign tickets to Engineers"
-        );
-      }
-    } else {
-      throw ApiError.forbidden("You don't have permission to assign tickets");
+    if (!assignToUser.isActive) {
+      throw ApiError.badRequest("Cannot assign ticket to inactive user");
     }
 
+    // Check if the user has appropriate role to be assigned tickets
+    if (
+      assignToUser.role !== ROLES.ENGINEER &&
+      assignToUser.role !== ROLES.SUPPORT_MANAGER &&
+      assignToUser.role !== ROLES.SUPER_ADMIN
+    ) {
+      throw ApiError.badRequest(
+        "Tickets can only be assigned to Engineers, Support Managers, or Super Admins"
+      );
+    }
+
+    // Only Super Admin or Support Manager can assign tickets
+    if (userRole !== ROLES.SUPER_ADMIN && userRole !== ROLES.SUPPORT_MANAGER) {
+      throw ApiError.forbidden(
+        "Only Super Admins and Support Managers can assign tickets"
+      );
+    }
+
+    // Create assignment record
     const assignmentRecord = {
       assignedTo: assignToUserId,
       assignedBy: assignedByUserId,
@@ -752,16 +928,42 @@ class TicketService {
       notes: notes,
     };
 
-    ticket.assignedTo = assignToUserId;
-    ticket.assignedBy = assignedByUserId;
-    ticket.assignedAt = new Date();
-    ticket.status = "ASSIGNED";
+    // Initialize or update assignment history
+    if (!ticket.assignmentHistory) {
+      ticket.assignmentHistory = [];
+    }
 
     ticket.assignmentHistory.push(assignmentRecord);
 
+    // Update current assignment
+    ticket.assignedTo = assignToUserId;
+    ticket.assignedBy = assignedByUserId;
+    ticket.assignedAt = new Date();
+
+    // Update status if not already in progress
+    if (ticket.status === "OPEN") {
+      ticket.status = "ASSIGNED";
+    }
+
+    // Record in history
+    const historyEntry = {
+      action: "ASSIGNED",
+      performedBy: assignedByUserId,
+      timestamp: new Date(),
+      comment: notes || `Ticket assigned to ${assignToUser.name}`,
+      changes: {
+        assignedTo: assignToUserId,
+        previousAssignee: ticket.assignedTo || "None",
+        status: ticket.status,
+      },
+    };
+
+    ticket.history.push(historyEntry);
+
+    // Save ticket
     await ticket.save();
 
-    // Send notification about the assignment
+    // Notify the assigned user
     await this.notifyTicketAssignment(ticket, assignedByUserId);
 
     return ticket;
@@ -799,31 +1001,51 @@ class TicketService {
    */
   static async approveTicket(ticketId, userId, userRole) {
     const ticket = await Ticket.findById(ticketId);
-
     if (!ticket) {
       throw ApiError.notFound("Ticket not found");
     }
 
-    // Check if ticket is in pending approval status
+    // Validate that ticket is in the correct state for approval
     if (ticket.status !== "PENDING_APPROVAL") {
       throw ApiError.badRequest(
-        "Only tickets with status 'PENDING_APPROVAL' can be approved"
+        "Only tickets in 'Pending Approval' status can be approved"
       );
     }
 
-    // Check if user has permission to approve
+    // Check role permissions
     if (userRole !== ROLES.SUPER_ADMIN && userRole !== ROLES.SUPPORT_MANAGER) {
-      throw ApiError.forbidden("You don't have permission to approve tickets");
+      throw ApiError.forbidden(
+        "Only Super Admins and Support Managers can approve tickets"
+      );
     }
 
-    // Approve the ticket
+    // Update ticket status
     ticket.status = "RESOLVED";
     ticket.approvedBy = userId;
     ticket.approvedAt = new Date();
 
+    // Add history entry
+    const historyEntry = {
+      action: "STATUS_CHANGED",
+      performedBy: userId,
+      timestamp: new Date(),
+      comment: "Ticket resolution approved",
+      changes: {
+        status: {
+          from: "PENDING_APPROVAL",
+          to: "RESOLVED",
+        },
+        approvedBy: userId,
+        approvedAt: new Date(),
+      },
+    };
+
+    ticket.history.push(historyEntry);
+
+    // Save ticket
     await ticket.save();
 
-    // Notify the resolver that their resolution was approved
+    // Notify relevant parties
     await this.notifyTicketApproved(ticket, userId);
 
     return ticket;
@@ -854,6 +1076,20 @@ class TicketService {
     };
 
     ticket.comments.push(commentData);
+
+    // Add to history
+    const historyEntry = {
+      action: "COMMENT_ADDED",
+      performedBy: userId,
+      timestamp: new Date(),
+      comment: comment,
+      changes: {
+        isInternal: isInternal || false,
+        hasAttachments: (attachments && attachments.length > 0) || false,
+      },
+    };
+
+    ticket.history.push(historyEntry);
     await ticket.save();
 
     // Notify relevant parties about the new comment
@@ -903,78 +1139,63 @@ class TicketService {
       case "RESOLVED":
         // Notify creator
         notifyUserId = ticket.createdBy;
-        message = `Your ticket "${ticket.title}" (#${ticket._id.toString().slice(-6)}) has been resolved by ${actionUsername}.`;
+        message = `Your ticket "${ticket.title}" has been resolved by ${actionUsername}.`;
         break;
 
-      case "PENDING_APPROVAL":
-        // Notify support managers or admins
-        const supportManagers = await User.find({
-          role: ROLES.SUPPORT_MANAGER,
-          isActive: true,
-        }).select("_id");
-
-        for (const manager of supportManagers) {
-          await notify({
-            userId: manager._id,
-            subject: `Ticket Needs Approval: ${ticket.title} (#${ticket._id.toString().slice(-6)})`,
-            message: `A ticket resolution by ${actionUsername} is waiting for your approval. Ticket: "${ticket.title}" (#${ticket._id.toString().slice(-6)})`,
-            notificationType: "TICKET_PENDING_APPROVAL",
-          });
-        }
-        return;
+      case "ASSIGNED":
+        // Notify assigned user
+        notifyUserId = ticket.assignedTo;
+        message = `A ticket "${ticket.title}" has been assigned to you by ${actionUsername}.`;
+        break;
 
       case "CLOSED":
-        // Notify assignee and creator
-        notifyUserId = [ticket.assignedTo, ticket.createdBy].filter(Boolean);
-        message = `Ticket "${ticket.title}" (#${ticket._id.toString().slice(-6)}) has been closed by ${actionUsername}.`;
+        // Notify creator
+        notifyUserId = ticket.createdBy;
+        message = `Your ticket "${ticket.title}" has been closed by ${actionUsername}.`;
+        break;
+
+      case "CLOSED_BY_CUSTOMER":
+        // Notify assigned user (if any)
+        if (ticket.assignedTo) {
+          notifyUserId = ticket.assignedTo;
+          message = `Ticket "${ticket.title}" has been closed by the customer according to ${actionUsername}.`;
+        }
         break;
 
       case "REOPENED":
-        // Notify assignee and managers
-        const managers = await User.find({
-          role: ROLES.SUPPORT_MANAGER,
-          isActive: true,
-        }).select("_id");
-
-        const notifyIds = [
-          ticket.assignedTo,
-          ...managers.map((m) => m._id),
-        ].filter(Boolean);
-
-        for (const userId of notifyIds) {
-          await notify({
-            userId,
-            subject: `Ticket Reopened: ${ticket.title} (#${ticket._id.toString().slice(-6)})`,
-            message: `${actionUsername} has reopened the ticket "${ticket.title}" (#${ticket._id.toString().slice(-6)}).`,
-            notificationType: "TICKET_REOPENED",
-          });
+        // Notify assigned user or most recently assigned user
+        if (ticket.assignedTo) {
+          notifyUserId = ticket.assignedTo;
+        } else if (
+          ticket.assignmentHistory &&
+          ticket.assignmentHistory.length > 0
+        ) {
+          const latestAssignment =
+            ticket.assignmentHistory[ticket.assignmentHistory.length - 1];
+          notifyUserId = latestAssignment.assignedTo;
         }
-        return;
+        message = `Ticket "${ticket.title}" has been reopened by ${actionUsername}.`;
+        break;
 
-      default:
-        return; // Don't notify for other status changes
+      case "IN_PROGRESS":
+        // Notify creator
+        notifyUserId = ticket.createdBy;
+        message = `Your ticket "${ticket.title}" is now in progress.`;
+        break;
     }
 
-    // Send notification if needed
-    if (notifyUserId && message) {
-      if (Array.isArray(notifyUserId)) {
-        for (const userId of notifyUserId) {
-          if (userId && userId.toString() !== actionUserId) {
-            await notify({
-              userId,
-              subject: `Ticket Update: ${ticket.title} (#${ticket._id.toString().slice(-6)})`,
-              message,
-              notificationType: "TICKET_STATUS_CHANGED",
-            });
-          }
-        }
-      } else if (notifyUserId.toString() !== actionUserId) {
-        await notify({
+    if (notifyUserId && notifyUserId !== actionUserId) {
+      // Add notification logic here
+      try {
+        await NotificationService.addNotification({
           userId: notifyUserId,
-          subject: `Ticket Update: ${ticket.title} (#${ticket._id.toString().slice(-6)})`,
+          title: "Ticket Status Update",
           message,
-          notificationType: "TICKET_STATUS_CHANGED",
+          type: "TICKET_UPDATE",
+          referenceId: ticket._id,
         });
+      } catch (error) {
+        console.error("Failed to send notification:", error);
       }
     }
   }
@@ -1064,65 +1285,6 @@ class TicketService {
           notificationType: "TICKET_COMMENT",
         });
       }
-    }
-  }
-
-  /**
-   * Add attachments to a ticket
-   * @param {String} ticketId - Ticket ID
-   * @param {Object} formData - FormData containing files
-   * @param {String} userId - ID of the user adding attachments
-   * @returns {Promise<Object>} - Updated ticket data
-   */
-  static async addAttachments(ticketId, formData, userId) {
-    const ticket = await Ticket.findById(ticketId);
-
-    if (!ticket) {
-      throw ApiError.notFound("Ticket not found");
-    }
-
-    if (!formData || !formData.files || formData.files.length === 0) {
-      throw ApiError.badRequest("Files are required");
-    }
-
-    try {
-      const files = Array.isArray(formData.files)
-        ? formData.files
-        : [formData.files];
-
-      const uploadPromises = files.map(async (file) => {
-        if (file.cloudinaryUrl) {
-          return {
-            url: file.cloudinaryUrl,
-            filename: file.originalname,
-            mimeType: file.mimetype,
-            size: file.size,
-            uploadedBy: userId,
-            uploadedAt: new Date(),
-          };
-        }
-
-        const result = await uploadToCloudinary(file);
-
-        return {
-          url: result.secure_url,
-          filename: file.originalname,
-          mimeType: file.mimetype,
-          size: file.size,
-          uploadedBy: userId,
-          uploadedAt: new Date(),
-        };
-      });
-
-      const attachments = await Promise.all(uploadPromises);
-
-      ticket.attachments.push(...attachments);
-      await ticket.save();
-
-      return ticket;
-    } catch (error) {
-      console.error("Error uploading files:", error);
-      throw ApiError.internal("Error uploading files to storage");
     }
   }
 }

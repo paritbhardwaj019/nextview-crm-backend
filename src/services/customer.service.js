@@ -27,6 +27,7 @@ class CustomerService {
     // Handle location filtering
     if (query.state) queryObject.state = { $regex: query.state, $options: "i" };
     if (query.city) queryObject.city = { $regex: query.city, $options: "i" };
+    if (query.source) queryObject.source = query.source;
 
     return await Customer.paginate(queryObject, options);
   }
@@ -78,6 +79,7 @@ class CustomerService {
     const customer = await Customer.create({
       ...customerData,
       createdBy: userId,
+      source: customerData.source || "manual",
     });
 
     return customer;
@@ -149,7 +151,7 @@ class CustomerService {
     }
 
     // If no associated records, truly delete
-    await customer.remove();
+    await Customer.findByIdAndDelete(id);
     return { success: true, message: "Customer deleted successfully" };
   }
 

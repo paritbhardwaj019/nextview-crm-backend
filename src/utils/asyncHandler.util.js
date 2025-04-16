@@ -6,7 +6,9 @@ const asyncHandler = (fn) => {
       await fn(req, res, next);
     } catch (error) {
       if (error instanceof ApiError) {
-        res.status(error.statusCode).json({
+        const statusCode =
+          typeof error.statusCode === "number" ? error.statusCode : 500;
+        res.status(statusCode).json({
           status: "error",
           message: error.message,
           errors: error.errors,

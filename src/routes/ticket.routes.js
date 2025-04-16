@@ -77,6 +77,27 @@ router.get(
 
 /**
  * @swagger
+ * /api/tickets/count-by-date-type:
+ *   get:
+ *     summary: Get ticket count by date and type
+ *     description: Retrieve ticket count by date and type.
+ *     tags: [Tickets]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Ticket count retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.get(
+  "/count-by-date-type",
+  AuthMiddleware.authenticate,
+  TicketController.getTicketCountByDateAndType
+);
+
+/**
+ * @swagger
  * /api/tickets/{id}:
  *   get:
  *     summary: Get ticket by ID
@@ -565,6 +586,49 @@ router.get(
   AuthMiddleware.authenticate,
   AuthMiddleware.requirePermission(PERMISSIONS.VIEW_TICKET),
   TicketController.getSerialNumberMetadata
+);
+
+/**
+ * @swagger
+ * /api/tickets/{id}/history:
+ *   get:
+ *     summary: Get ticket update history
+ *     description: Retrieve the complete update history for a ticket including all changes.
+ *     tags: [Tickets]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Ticket ID
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: Ticket history retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Ticket not found
+ */
+router.get(
+  "/:id/history",
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requirePermission(PERMISSIONS.VIEW_TICKET),
+  TicketController.getTicketHistory
 );
 
 module.exports = router;
