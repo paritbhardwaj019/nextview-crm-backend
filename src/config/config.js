@@ -13,6 +13,13 @@ const config = {
     options: {
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 60000,
+      socketTimeoutMS: 90000,
+      connectTimeoutMS: 60000,
+      maxPoolSize: 50,
+      minPoolSize: 10,
+      retryWrites: true,
+      retryReads: true,
     },
   },
   jwt: {

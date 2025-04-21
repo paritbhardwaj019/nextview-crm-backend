@@ -237,4 +237,18 @@ router.post(
   ItemController.checkExcelData
 );
 
+/**
+ * @route GET /api/items/transactions/:id
+ * @desc Get transaction details for challan
+ * @access Private
+ */
+router.get("/transactions/:id", ItemController.getTransactionDetails);
+
+/**
+ * @route POST /api/items/challans
+ * @desc Record challan print
+ * @access Private
+ */
+router.post("/challans", ItemController.recordChallanPrint);
+
 module.exports = router;

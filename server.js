@@ -3,6 +3,7 @@ const config = require("./src/config/config");
 const mongoose = require("mongoose");
 const TicketSettings = require("./src/models/ticketSettings.model");
 const Role = require("./src/models/role.model");
+const { initReportCronJobs } = require("./src/cron/reportCron");
 
 const PORT = config.app.port;
 
@@ -103,19 +104,27 @@ const seedDefaultRoles = async () => {
   }
 };
 
+// Connect to MongoDB
 mongoose
   .connect(config.db.uri, config.db.options)
   .then(async () => {
     console.log("Connected to MongoDB");
 
+    // Seed ticket settings
     await seedTicketSettings();
+
+    // Seed default roles
     await seedDefaultRoles();
 
-    // Start server after seeding
+    // Initialize report cron jobs
+    initReportCronJobs();
+
+    // Start the server
     const server = app.listen(PORT, () => {
       console.log(`Server running in ${config.app.env} mode on port ${PORT}`);
     });
 
+    // Handle unhandled promise rejections
     process.on("unhandledRejection", (err) => {
       console.error("UNHANDLED REJECTION! Shutting down...");
       console.error(err.name, err.message);
@@ -134,6 +143,7 @@ mongoose
       process.exit(1);
     });
 
+    // Handle SIGTERM signal
     process.on("SIGTERM", () => {
       console.log("SIGTERM received. Shutting down gracefully");
 
@@ -142,7 +152,7 @@ mongoose
       });
     });
   })
-  .catch((err) => {
-    console.error("MongoDB connection error:", err);
+  .catch((error) => {
+    console.error("MongoDB connection error:", error);
     process.exit(1);
   });

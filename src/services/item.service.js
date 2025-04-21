@@ -420,6 +420,79 @@ class ItemService {
 
     return lowStockItems;
   }
+
+  /**
+   * Get transaction details for challan
+   * @param {string} transactionId - Transaction ID
+   * @returns {Promise<Object>} - Transaction details with item info
+   */
+  static async getTransactionDetails(transactionId) {
+    // Find the transaction in the item's transactions array
+    const item = await Item.findOne(
+      { "transactions._id": transactionId },
+      {
+        name: 1,
+        sku: 1,
+        category: 1,
+        "transactions.$": 1,
+      }
+    ).populate("transactions.performedBy", "name email");
+
+    if (!item || !item.transactions || item.transactions.length === 0) {
+      throw ApiError.notFound("Transaction not found");
+    }
+
+    const transaction = item.transactions[0];
+
+    // Format the response with necessary details for challan
+    return {
+      transaction: {
+        ...transaction.toObject(),
+        transactionId: transaction._id,
+        performedAt: transaction.performedAt,
+      },
+      item: {
+        _id: item._id,
+        name: item.name,
+        sku: item.sku,
+        category: item.category,
+      },
+    };
+  }
+
+  /**
+   * Record challan print
+   * @param {Object} challanData - Challan data
+   * @param {string} userId - ID of user recording the challan
+   * @returns {Promise<Object>} - Recorded challan
+   */
+  static async recordChallanPrint(challanData, userId) {
+    const { transactionId, challanNumber, itemId, quantity, condition } =
+      challanData;
+
+    if (!transactionId || !itemId) {
+      throw ApiError.badRequest("Transaction ID and Item ID are required");
+    }
+
+    const item = await Item.findById(itemId);
+    if (!item) {
+      throw ApiError.notFound("Item not found");
+    }
+
+    const challanRecord = {
+      challanNumber: challanNumber || `OUT-${Date.now().toString().slice(-6)}`,
+      transactionId,
+      itemId,
+      itemName: item.name,
+      itemSku: item.sku,
+      quantity: quantity || 0,
+      condition: condition || "NEW",
+      printedBy: userId,
+      printedAt: new Date(),
+    };
+
+    return challanRecord;
+  }
 }
 
 module.exports = ItemService;

@@ -46,10 +46,7 @@ const swaggerOptions = {
         name: "Tickets",
         description: "Ticket management operations",
       },
-      {
-        name: "Installation Requests",
-        description: "Installation request operations",
-      },
+
       {
         name: "Items",
         description: "Item management operations",

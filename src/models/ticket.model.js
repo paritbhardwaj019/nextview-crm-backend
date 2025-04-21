@@ -256,7 +256,6 @@ const ticketSchema = new mongoose.Schema(
           type: Object,
           default: {},
         },
-        // For changes that involve field updates
         fieldChanges: [
           {
             field: String,
@@ -270,9 +269,7 @@ const ticketSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Generate ticket IDs automatically
 ticketSchema.pre("save", async function (next) {
-  // Only generate a ticket ID if it doesn't exist yet
   if (!this.ticketId) {
     try {
       const date = new Date();
@@ -281,14 +278,12 @@ ticketSchema.pre("save", async function (next) {
       const day = String(date.getDate()).padStart(2, "0");
       const dateString = `${year}${month}${day}`;
 
-      // Find the latest ticket to generate a sequential number
       const latestTicket = await this.constructor
         .findOne({ ticketId: { $regex: `TKT${dateString}` } })
         .sort({ ticketId: -1 });
 
       let sequenceNumber = 1;
       if (latestTicket) {
-        // Extract the numeric part at the end of the ticketId
         const match = latestTicket.ticketId.match(/TKT\d+(\d{4})/);
         if (match && match[1]) {
           sequenceNumber = parseInt(match[1]) + 1;
@@ -385,27 +380,24 @@ ticketSchema.pre("remove", async function (next) {
   }
 });
 
-// Indexes for better performance
 ticketSchema.index({ status: 1 });
 ticketSchema.index({ assignedTo: 1 });
 ticketSchema.index({ createdBy: 1 });
 ticketSchema.index({ priority: 1 });
 ticketSchema.index({ category: 1 });
 ticketSchema.index({ createdAt: -1 });
-ticketSchema.index({ ticketId: 1 }, { unique: true });
+ticketSchema.index({ ticketId: 1 });
 ticketSchema.index({ itemId: 1 });
 ticketSchema.index({ serialNumber: 1 });
 ticketSchema.index({ customerId: 1 });
 ticketSchema.index({ type: 1 });
 
-// Virtual for calculating age of ticket in days
 ticketSchema.virtual("ageInDays").get(function () {
   return Math.ceil(
     (new Date() - new Date(this.createdAt)) / (1000 * 60 * 60 * 24)
   );
 });
 
-// Virtual for calculating how long the ticket has been assigned
 ticketSchema.virtual("timeInCurrentAssignment").get(function () {
   if (!this.assignedAt) return null;
   return Math.ceil(

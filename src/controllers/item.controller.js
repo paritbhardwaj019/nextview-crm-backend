@@ -377,6 +377,40 @@ class ItemController {
       lowStockItems
     );
   });
+
+  /**
+   * Get transaction details for challan
+   */
+  static getTransactionDetails = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    const transaction = await ItemService.getTransactionDetails(id);
+
+    return ApiResponse.success(
+      res,
+      "Transaction details retrieved successfully",
+      transaction
+    );
+  });
+
+  /**
+   * Record challan print
+   */
+  static recordChallanPrint = asyncHandler(async (req, res) => {
+    const challanData = req.body;
+    const userId = req.user.id;
+
+    const challan = await ItemService.recordChallanPrint(challanData, userId);
+
+    await ActivityLogService.logActivity({
+      userId: req.user.id,
+      action: "CHALLAN_PRINTED",
+      details: `Printed outward challan for item: ${challan.itemName}`,
+      ipAddress: req.ip,
+    });
+
+    return ApiResponse.success(res, "Challan recorded successfully", challan);
+  });
 }
 
 module.exports = ItemController;

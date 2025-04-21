@@ -1,0 +1,21 @@
+Category,Value
+TICKET COUNTS BY STATUS,
+CLOSED_BY_CUSTOMER,1
+OPEN,1
+,
+TICKET COUNTS BY PRIORITY,
+MEDIUM,2
+,
+TICKET COUNTS BY CATEGORY,
+OTHER,1
+SOFTWARE,1
+,
+ENGINEER PERFORMANCE,
+THIS IS NEW ENGINNER - Assigned Tickets,0
+THIS IS NEW ENGINNER - Resolved Tickets,0
+THIS IS NEW ENGINNER - Avg Resolution Time (hours),0.00
+,
+new user - Assigned Tickets,0
+new user - Resolved Tickets,0
+new user - Avg Resolution Time (hours),0.00
+,
