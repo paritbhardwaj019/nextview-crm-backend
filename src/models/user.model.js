@@ -66,13 +66,6 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: [
-        ROLES.SUPER_ADMIN,
-        ROLES.SUPPORT_MANAGER,
-        ROLES.ENGINEER,
-        ROLES.DISPATCH_MANAGER,
-        ROLES.INVENTORY_MANAGER,
-      ],
       required: true,
     },
     name: {
