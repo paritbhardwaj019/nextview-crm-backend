@@ -96,8 +96,135 @@ const seedDefaultRoles = async () => {
       console.log("Default roles created successfully!");
     } else {
       console.log(
-        `Found ${existingRolesCount} existing roles. Skipping default role creation.`
+        `Found ${existingRolesCount} existing roles. Checking for updates...`
       );
+
+      const permissionModule = require("./src/config/permissions");
+      const allPermissions = Object.values(permissionModule.PERMISSIONS);
+      const rolePermissions = permissionModule.ROLE_PERMISSIONS;
+
+      const defaultRoles = [
+        {
+          name: "Super Admin",
+          code: "SUPER_ADMIN",
+          description: "Full system access with all permissions",
+          permissions: allPermissions,
+          allowedTicketTypes: [
+            "SERVICE",
+            "INSTALLATION",
+            "CHARGEABLE",
+            "IN_WARRANTY",
+            "OUT_OF_WARRANTY",
+            "REPAIR",
+            "MAINTENANCE",
+            "COMPLAINT",
+            "DISPATCH",
+          ],
+          isDefault: true,
+        },
+        {
+          name: "Support Manager",
+          code: "SUPPORT_MANAGER",
+          description: "Manages support tickets and engineers",
+          permissions: rolePermissions.SUPPORT_MANAGER || [],
+          allowedTicketTypes: ["SERVICE", "INSTALLATION", "CHARGEABLE"],
+          isDefault: true,
+        },
+        {
+          name: "Engineer",
+          code: "ENGINEER",
+          description: "Handles technical support and installations",
+          permissions: rolePermissions.ENGINEER || [],
+          allowedTicketTypes: ["SERVICE", "INSTALLATION", "CHARGEABLE"],
+          isDefault: true,
+        },
+        {
+          name: "Inventory Manager",
+          code: "INVENTORY_MANAGER",
+          description: "Manages inventory and stock levels",
+          permissions: rolePermissions.INVENTORY_MANAGER || [],
+          allowedTicketTypes: ["SERVICE", "INSTALLATION", "CHARGEABLE"],
+          isDefault: true,
+        },
+        {
+          name: "Dispatch Manager",
+          code: "DISPATCH_MANAGER",
+          description: "Manages shipping and deliveries",
+          permissions: rolePermissions.DISPATCH_MANAGER || [],
+          allowedTicketTypes: ["DISPATCH"],
+          isDefault: true,
+        },
+      ];
+
+      for (const defaultRole of defaultRoles) {
+        const existingRole = await Role.findOne({ code: defaultRole.code });
+
+        if (existingRole) {
+          let needsUpdate = false;
+
+          // Check for missing permissions
+          if (defaultRole.code === "SUPER_ADMIN") {
+            const missingPermissions = allPermissions.filter(
+              (permission) => !existingRole.permissions.includes(permission)
+            );
+            if (missingPermissions.length > 0) {
+              console.log(
+                `Adding new permissions to Super Admin:`,
+                missingPermissions
+              );
+              existingRole.permissions = [
+                ...new Set([
+                  ...existingRole.permissions,
+                  ...missingPermissions,
+                ]),
+              ];
+              needsUpdate = true;
+            }
+          } else {
+            const newPermissions = defaultRole.permissions.filter(
+              (permission) => !existingRole.permissions.includes(permission)
+            );
+            if (newPermissions.length > 0) {
+              console.log(
+                `Adding new permissions to ${defaultRole.name}:`,
+                newPermissions
+              );
+              existingRole.permissions = [
+                ...new Set([...existingRole.permissions, ...newPermissions]),
+              ];
+              needsUpdate = true;
+            }
+          }
+
+          // Check for allowedTicketTypes updates
+          const missingTicketTypes = defaultRole.allowedTicketTypes.filter(
+            (type) => !existingRole.allowedTicketTypes.includes(type)
+          );
+          if (missingTicketTypes.length > 0) {
+            console.log(
+              `Adding new ticket types to ${defaultRole.name}:`,
+              missingTicketTypes
+            );
+            existingRole.allowedTicketTypes = [
+              ...new Set([
+                ...existingRole.allowedTicketTypes,
+                ...missingTicketTypes,
+              ]),
+            ];
+            needsUpdate = true;
+          }
+
+          if (needsUpdate) {
+            console.log(`Updating role: ${defaultRole.name}`);
+            await existingRole.save();
+          }
+        } else {
+          console.log(`Creating missing default role: ${defaultRole.name}`);
+          await Role.create(defaultRole);
+        }
+      }
+
+      console.log("Role updates completed successfully!");
     }
   } catch (error) {
     console.error("Error seeding default roles:", error);

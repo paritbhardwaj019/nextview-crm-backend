@@ -189,23 +189,28 @@ class RoleController {
    */
   static updateRolePermissions = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { permissions } = req.body;
+    const { permissions, allowedTicketTypes } = req.body;
     const userId = req.user.id;
 
     if (!permissions || !Array.isArray(permissions)) {
       throw ApiError.badRequest("Permissions must be an array");
     }
 
+    if (allowedTicketTypes && !Array.isArray(allowedTicketTypes)) {
+      throw ApiError.badRequest("Allowed ticket types must be an array");
+    }
+
     const role = await RoleService.updateRolePermissions(
       id,
       permissions,
+      allowedTicketTypes,
       userId
     );
 
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "ROLE_PERMISSIONS_UPDATED",
-      details: `Updated permissions for role: ${role.name} (${role.code})`,
+      details: `Updated permissions and allowed ticket types for role: ${role.name} (${role.code})`,
       ipAddress: req.ip,
     });
 

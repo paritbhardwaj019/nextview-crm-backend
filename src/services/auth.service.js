@@ -5,15 +5,11 @@ const { sendEmail } = require("./notification.service");
 const ApiError = require("../utils/apiError.util");
 const config = require("../config/config");
 const { ROLES, isRoleAuthorized } = require("../config/roles");
+const Role = require("../models/role.model");
 
 class AuthService {
   static async login(email, password) {
-    console.log("EMAIL", email);
-    console.log("PASSWORD", password);
-
     const user = await User.findOne({ email, isActive: true });
-
-    console.log("USER", user);
 
     if (!user) {
       throw ApiError.unauthorized("Invalid credentials");
@@ -25,6 +21,8 @@ class AuthService {
       throw ApiError.unauthorized("Invalid credentials");
     }
 
+    const role = await Role.findOne({ code: user.role });
+
     await User.findByIdAndUpdate(user._id, { lastLogin: new Date() });
 
     return {
@@ -33,7 +31,7 @@ class AuthService {
         id: user._id,
         email: user.email,
         name: user.name,
-        role: user.role,
+        role: role ?? user.role,
       },
     };
   }

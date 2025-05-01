@@ -298,6 +298,32 @@ class UserController {
       preferences
     );
   });
+
+  /**
+   * Delete user
+   * Access: SUPER_ADMIN, SUPPORT_MANAGER (for ENGINEER only)
+   */
+  static deleteUser = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const userRole = req.user.role;
+    const userId = req.user.id;
+
+    const user = await UserService.deleteUser(id, userId, userRole);
+
+    // Log activity
+    await ActivityLogService.logActivity({
+      userId: req.user.id,
+      action: "USER_DELETED",
+      details: `Deleted user ${user.name} (${user.email})`,
+      ipAddress: req.ip,
+    });
+
+    return ApiResponse.success(res, "User deleted successfully", {
+      _id: user._id,
+      email: user.email,
+      name: user.name,
+    });
+  });
 }
 
 module.exports = UserController;

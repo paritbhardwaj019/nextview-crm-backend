@@ -28,6 +28,11 @@ const mongoose = require("mongoose");
  *           items:
  *             type: string
  *           description: List of permission codes assigned to this role
+ *         allowedTicketTypes:
+ *           type: array
+ *           items:
+ *             type: string
+ *           description: List of allowed ticket types for this role
  *         isDefault:
  *           type: boolean
  *           description: Whether this is a system default role that cannot be deleted
@@ -68,6 +73,21 @@ const roleSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    allowedTicketTypes: {
+      type: [String],
+      default: [],
+      enum: [
+        "SERVICE",
+        "INSTALLATION",
+        "CHARGEABLE",
+        "IN_WARRANTY",
+        "OUT_OF_WARRANTY",
+        "REPAIR",
+        "MAINTENANCE",
+        "COMPLAINT",
+        "DISPATCH",
+      ],
+    },
     isDefault: {
       type: Boolean,
       default: false,
@@ -96,59 +116,120 @@ roleSchema.statics.createDefaultRoles = async function () {
       name: "Super Admin",
       code: "SUPER_ADMIN",
       description: "Full system access with all permissions",
-      permissions: [], // Will be populated with all permissions
+      permissions: [],
+      allowedTicketTypes: [
+        "SERVICE",
+        "INSTALLATION",
+        "CHARGEABLE",
+        "IN_WARRANTY",
+        "OUT_OF_WARRANTY",
+        "COMPLAINT",
+        "DISPATCH",
+      ],
       isDefault: true,
     },
     {
       name: "Support Manager",
       code: "SUPPORT_MANAGER",
       description: "Manages support tickets and engineers",
-      permissions: [], // Will be populated based on ROLE_PERMISSIONS
+      permissions: [],
+      allowedTicketTypes: ["SERVICE", "INSTALLATION", "CHARGEABLE"],
       isDefault: true,
     },
     {
       name: "Engineer",
       code: "ENGINEER",
       description: "Handles technical support and installations",
-      permissions: [], // Will be populated based on ROLE_PERMISSIONS
+      permissions: [],
+      allowedTicketTypes: ["SERVICE", "INSTALLATION", "CHARGEABLE"],
       isDefault: true,
     },
     {
       name: "Inventory Manager",
       code: "INVENTORY_MANAGER",
       description: "Manages inventory and stock levels",
-      permissions: [], // Will be populated based on ROLE_PERMISSIONS
+      permissions: [],
+      allowedTicketTypes: ["SERVICE", "INSTALLATION", "CHARGEABLE"],
       isDefault: true,
     },
     {
       name: "Dispatch Manager",
       code: "DISPATCH_MANAGER",
       description: "Manages shipping and deliveries",
-      permissions: [], // Will be populated based on ROLE_PERMISSIONS
+      permissions: [],
+      allowedTicketTypes: ["DISPATCH"],
       isDefault: true,
     },
   ];
 
   const permissionModule = require("../config/permissions");
   const allPermissions = Object.values(permissionModule.PERMISSIONS);
-
   const rolePermissions = permissionModule.ROLE_PERMISSIONS;
 
   for (const role of defaultRoles) {
+    // Set permissions based on role
     if (role.code === "SUPER_ADMIN") {
       role.permissions = allPermissions;
     } else {
       role.permissions = rolePermissions[role.code] || [];
     }
 
-    await this.findOneAndUpdate(
-      { code: role.code },
-      { $setOnInsert: role },
-      { upsert: true, new: true }
-    );
+    const existingRole = await this.findOne({ code: role.code });
+
+    if (existingRole) {
+      let needsUpdate = false;
+
+      // For Super Admin, ensure it has all permissions
+      if (role.code === "SUPER_ADMIN") {
+        const missingPermissions = allPermissions.filter(
+          (permission) => !existingRole.permissions.includes(permission)
+        );
+        if (missingPermissions.length > 0) {
+          console.log(
+            `Adding new permissions to Super Admin:`,
+            missingPermissions
+          );
+          existingRole.permissions = [
+            ...new Set([...existingRole.permissions, ...missingPermissions]),
+          ];
+          needsUpdate = true;
+        }
+      } else {
+        // For other roles, check for new permissions from ROLE_PERMISSIONS
+        const newPermissions = role.permissions.filter(
+          (permission) => !existingRole.permissions.includes(permission)
+        );
+        if (newPermissions.length > 0) {
+          console.log(
+            `Adding new permissions to ${role.name}:`,
+            newPermissions
+          );
+          existingRole.permissions = [
+            ...new Set([...existingRole.permissions, ...newPermissions]),
+          ];
+          needsUpdate = true;
+        }
+      }
+
+      // Check for allowedTicketTypes updates
+      if (
+        JSON.stringify(existingRole.allowedTicketTypes) !==
+        JSON.stringify(role.allowedTicketTypes)
+      ) {
+        console.log(`Updating allowedTicketTypes for ${role.name}`);
+        existingRole.allowedTicketTypes = role.allowedTicketTypes;
+        needsUpdate = true;
+      }
+
+      if (needsUpdate) {
+        await existingRole.save();
+      }
+    } else {
+      await this.create(role);
+    }
   }
 
-  console.log("Default roles created successfully");
+  console.log("Default roles created/updated successfully");
 };
 
 const Role = mongoose.model("Role", roleSchema);

@@ -229,7 +229,12 @@ class RoleService {
   /**
    * Update permissions for a role
    */
-  static async updateRolePermissions(roleId, permissions, userId) {
+  static async updateRolePermissions(
+    roleId,
+    permissions,
+    allowedTicketTypes,
+    userId
+  ) {
     const role = await this.getRoleById(roleId);
 
     // Validate permissions exist
@@ -244,7 +249,30 @@ class RoleService {
       );
     }
 
+    // Validate ticket types if provided
+    if (allowedTicketTypes) {
+      const validTicketTypes = [
+        "INSTALLATION",
+        "REPAIR",
+        "MAINTENANCE",
+        "COMPLAINT",
+        "DISPATCH",
+      ];
+      const invalidTicketTypes = allowedTicketTypes.filter(
+        (type) => !validTicketTypes.includes(type)
+      );
+
+      if (invalidTicketTypes.length > 0) {
+        throw ApiError.badRequest(
+          `Invalid ticket types: ${invalidTicketTypes.join(", ")}`
+        );
+      }
+    }
+
     role.permissions = permissions;
+    if (allowedTicketTypes) {
+      role.allowedTicketTypes = allowedTicketTypes;
+    }
     role.updatedBy = userId;
     await role.save();
 

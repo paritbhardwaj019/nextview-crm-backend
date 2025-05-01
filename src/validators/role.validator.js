@@ -36,6 +36,21 @@ const rolePermissionsSchema = Joi.object({
     "array.base": "Permissions must be an array",
     "any.required": "Permissions are required",
   }),
+  allowedTicketTypes: Joi.array()
+    .items(
+      Joi.string().valid(
+        "INSTALLATION",
+        "REPAIR",
+        "MAINTENANCE",
+        "COMPLAINT",
+        "DISPATCH"
+      )
+    )
+    .messages({
+      "array.base": "Allowed ticket types must be an array",
+      "any.only":
+        "Invalid ticket type. Must be one of: INSTALLATION, REPAIR, MAINTENANCE, COMPLAINT, DISPATCH",
+    }),
 });
 
 module.exports = {

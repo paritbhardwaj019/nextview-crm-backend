@@ -365,4 +365,38 @@ router.put(
   UserController.updateNotificationPreferences
 );
 
+/**
+ * @swagger
+ * /users/{id}:
+ *   delete:
+ *     summary: Delete user
+ *     description: Delete a user account. SUPER_ADMIN can delete any user, SUPPORT_MANAGER can only delete ENGINEER.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: User not found
+ */
+router.delete(
+  "/:id",
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requirePermission(PERMISSIONS.DELETE_USER),
+  auditMiddleware("User"),
+  UserController.deleteUser
+);
+
 module.exports = router;

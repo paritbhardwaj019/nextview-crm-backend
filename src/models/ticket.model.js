@@ -50,6 +50,8 @@ const ticketSchema = new mongoose.Schema(
         "CHARGEABLE",
         "IN_WARRANTY",
         "OUT_OF_WARRANTY",
+        "COMPLAINT",
+        "DISPATCH",
       ],
       required: [true, "Ticket type is required"],
       default: "SERVICE",

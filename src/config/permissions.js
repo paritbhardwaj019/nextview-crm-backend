@@ -12,7 +12,6 @@ const PERMISSIONS = {
   CREATE_USER: "create_user",
   UPDATE_USER: "update_user",
   DELETE_USER: "delete_user",
-  VIEW_USER: "view_user",
 
   // Role Management
   CREATE_ROLE: "create_role",
@@ -58,6 +57,14 @@ const PERMISSIONS = {
   VIEW_SETTINGS: "view_settings",
   VIEW_AUDIT_LOGS: "view_audit_logs",
   VIEW_ACTIVITY_LOGS: "view_activity_logs",
+
+  VIEW_DASHBOARD: "view_dashboard",
+  VIEW_PROBLEM: "view_problem",
+  VIEW_CUSTOMER: "view_customer",
+  VIEW_LOG: "view_log",
+  VIEW_ROLE: "view_role",
+  VIEW_TICKET: "view_ticket",
+  VIEW_USER: "view_user",
 };
 
 /**

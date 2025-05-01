@@ -217,12 +217,6 @@ class UserService {
       );
     }
 
-    if (!isRoleAuthorized(requestingUserRole, user.role)) {
-      throw ApiError.forbidden(
-        "You do not have permission to reset password for this user"
-      );
-    }
-
     user.password = data.password;
     await user.save();
 
@@ -339,6 +333,40 @@ class UserService {
       new: true,
       upsert: true,
     });
+  }
+
+  /**
+   * Delete a user
+   * @param {String} id - User ID to delete
+   * @param {String} requestingUserId - ID of the user making the request
+   * @param {String} requestingUserRole - Role of the user making the request
+   * @returns {Promise<Object>} - Deleted user data
+   */
+  static async deleteUser(id, requestingUserId, requestingUserRole) {
+    const user = await User.findById(id);
+    if (!user) {
+      throw ApiError.notFound("User not found");
+    }
+
+    if (id === requestingUserId) {
+      throw ApiError.badRequest("Cannot delete your own account");
+    }
+
+    if (user.isDefault) {
+      throw ApiError.forbidden("Cannot delete default users");
+    }
+
+    if (
+      requestingUserRole === ROLES.SUPPORT_MANAGER &&
+      user.role !== ROLES.ENGINEER
+    ) {
+      throw ApiError.forbidden(
+        "Support Managers can only delete Engineer accounts"
+      );
+    }
+
+    await user.deleteOne();
+    return user;
   }
 }
 
