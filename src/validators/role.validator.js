@@ -39,9 +39,11 @@ const rolePermissionsSchema = Joi.object({
   allowedTicketTypes: Joi.array()
     .items(
       Joi.string().valid(
+        "SERVICE",
         "INSTALLATION",
-        "REPAIR",
-        "MAINTENANCE",
+        "CHARGEABLE",
+        "IN_WARRANTY",
+        "OUT_OF_WARRANTY",
         "COMPLAINT",
         "DISPATCH"
       )
@@ -49,7 +51,7 @@ const rolePermissionsSchema = Joi.object({
     .messages({
       "array.base": "Allowed ticket types must be an array",
       "any.only":
-        "Invalid ticket type. Must be one of: INSTALLATION, REPAIR, MAINTENANCE, COMPLAINT, DISPATCH",
+        "Invalid ticket type. Must be one of: INSTALLATION, REPAIR, MAINTENANCE, COMPLAINT, DISPATCH, SERVICE, CHARGEABLE",
     }),
 });
 

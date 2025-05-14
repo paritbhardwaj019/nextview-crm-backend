@@ -55,6 +55,8 @@ class UserController {
       ipAddress: req.ip,
     });
 
+    console.log("USER_RESULTS @user.controller.js", users.results);
+
     return ApiResponse.withPagination(
       res,
       "Users retrieved successfully",

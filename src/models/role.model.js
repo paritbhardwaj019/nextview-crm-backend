@@ -128,38 +128,6 @@ roleSchema.statics.createDefaultRoles = async function () {
       ],
       isDefault: true,
     },
-    {
-      name: "Support Manager",
-      code: "SUPPORT_MANAGER",
-      description: "Manages support tickets and engineers",
-      permissions: [],
-      allowedTicketTypes: ["SERVICE", "INSTALLATION", "CHARGEABLE"],
-      isDefault: true,
-    },
-    {
-      name: "Engineer",
-      code: "ENGINEER",
-      description: "Handles technical support and installations",
-      permissions: [],
-      allowedTicketTypes: ["SERVICE", "INSTALLATION", "CHARGEABLE"],
-      isDefault: true,
-    },
-    {
-      name: "Inventory Manager",
-      code: "INVENTORY_MANAGER",
-      description: "Manages inventory and stock levels",
-      permissions: [],
-      allowedTicketTypes: ["SERVICE", "INSTALLATION", "CHARGEABLE"],
-      isDefault: true,
-    },
-    {
-      name: "Dispatch Manager",
-      code: "DISPATCH_MANAGER",
-      description: "Manages shipping and deliveries",
-      permissions: [],
-      allowedTicketTypes: ["DISPATCH"],
-      isDefault: true,
-    },
   ];
 
   const permissionModule = require("../config/permissions");
@@ -167,7 +135,6 @@ roleSchema.statics.createDefaultRoles = async function () {
   const rolePermissions = permissionModule.ROLE_PERMISSIONS;
 
   for (const role of defaultRoles) {
-    // Set permissions based on role
     if (role.code === "SUPER_ADMIN") {
       role.permissions = allPermissions;
     } else {

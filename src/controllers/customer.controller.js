@@ -51,8 +51,6 @@ class CustomerController {
 
     const customers = await CustomerService.getAllCustomers(query, options);
 
-    console.log("CUSTOMERS", customers.results);
-
     // Log activity
     await ActivityLogService.logActivity({
       userId: req.user.id,

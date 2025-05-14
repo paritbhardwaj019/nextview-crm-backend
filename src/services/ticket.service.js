@@ -18,37 +18,51 @@ class TicketService {
    * @param {String} userRole - Role of the user making the request
    * @returns {Promise<Object>} - Paginated tickets data
    */
+  /**
+   * Get all tickets with pagination and filtering
+   * @param {Object} query - Query parameters for filtering tickets
+   * @param {Object} options - Pagination and sorting options
+   * @param {String} userId - ID of the user making the request
+   * @param {String} userRole - Role of the user making the request
+   * @returns {Promise<Object>} - Paginated tickets data
+   */
   static async getAllTickets(query, options, userId, userRole) {
-    const queryObject = { ...query };
+    let queryObject = { ...query };
 
-    if (query.type) {
-      queryObject.type = query.type;
-    }
-
-    if (query.customerId) {
-      queryObject.customerId = query.customerId;
-    }
-
-    if (userRole === ROLES.ENGINEER) {
-      queryObject.$or = [{ assignedTo: userId }, { createdBy: userId }];
+    if (userRole === ROLES.ENGINEER && !queryObject.assignedTo) {
+      queryObject = {
+        ...queryObject,
+        $or: [{ assignedTo: userId }, { createdBy: userId }],
+      };
     } else if (userRole === ROLES.SUPPORT_MANAGER) {
-      const engineersUnderManager = await User.find({
-        role: ROLES.ENGINEER,
-      }).select("_id");
+      if (!queryObject.$or) {
+        const engineersUnderManager = await User.find({
+          role: ROLES.ENGINEER,
+        }).select("_id");
 
-      const engineerIds = engineersUnderManager.map((e) => e._id);
+        const engineerIds = engineersUnderManager.map((e) => e._id);
 
-      queryObject.$or = [
-        { assignedTo: userId },
-        { createdBy: userId },
-        { assignedTo: { $in: engineerIds } },
-        { status: "PENDING_APPROVAL" },
-      ];
+        queryObject = {
+          ...queryObject,
+          $or: [
+            { assignedTo: userId },
+            { createdBy: userId },
+            { assignedTo: { $in: engineerIds } },
+            { status: "PENDING_APPROVAL" },
+          ],
+        };
+      }
     }
 
     const updatedOptions = {
       ...options,
-      populate: [...(options.populate || [])],
+      populate: [
+        ...(options.populate || []),
+        {
+          path: "customerId",
+          select: "name email mobile address city state pincode",
+        },
+      ],
     };
 
     return await Ticket.paginate(queryObject, updatedOptions);
@@ -76,11 +90,15 @@ class TicketService {
       throw ApiError.notFound("Ticket not found");
     }
 
+    console.log(
+      "USER_ID & USER_ROLE & TICKET @ticket.service.js L93",
+      userId,
+      userRole,
+      ticket
+    );
+
     if (userRole === ROLES.ENGINEER) {
-      if (
-        ticket.assignedTo?.toString() !== userId &&
-        ticket.createdBy.toString() !== userId
-      ) {
+      if (ticket.assignedTo?.toString() !== userId?.toString()) {
         throw ApiError.forbidden(
           "You do not have permission to view this ticket"
         );
@@ -92,12 +110,7 @@ class TicketService {
 
       const engineerIds = engineersUnderManager.map((e) => e._id.toString());
 
-      if (
-        ticket.assignedTo?.toString() !== userId &&
-        ticket.createdBy.toString() !== userId &&
-        !engineerIds.includes(ticket.assignedTo?.toString()) &&
-        ticket.status !== "PENDING_APPROVAL"
-      ) {
+      if (ticket.assignedTo?.toString() !== userId?.toString()) {
         throw ApiError.forbidden(
           "You do not have permission to view this ticket"
         );
@@ -336,11 +349,15 @@ class TicketService {
       throw ApiError.notFound("Ticket not found");
     }
 
+    console.log(
+      "USER_ID & USER_ROLE & TICKET @ticket.service.js L93",
+      userId,
+      userRole,
+      ticket
+    );
+
     if (userRole === ROLES.ENGINEER) {
-      if (
-        ticket.assignedTo?.toString() !== userId &&
-        ticket.createdBy.toString() !== userId
-      ) {
+      if (ticket.assignedTo?._id?.toString() !== userId?.toString()) {
         throw ApiError.forbidden(
           "You do not have permission to view this ticket"
         );
@@ -352,12 +369,7 @@ class TicketService {
 
       const engineerIds = engineersUnderManager.map((e) => e._id.toString());
 
-      if (
-        ticket.assignedTo?.toString() !== userId &&
-        ticket.createdBy.toString() !== userId &&
-        !engineerIds.includes(ticket.assignedTo?.toString()) &&
-        ticket.status !== "PENDING_APPROVAL"
-      ) {
+      if (ticket.assignedTo?._id?.toString() !== userId?.toString()) {
         throw ApiError.forbidden(
           "You do not have permission to view this ticket"
         );
@@ -657,14 +669,18 @@ class TicketService {
    * @private
    */
   static checkUpdatePermissions(ticket, updateData, userId, userRole) {
+    console.log("TICKET @ticket.service.js", ticket);
+    console.log("USER_ROLE @ticket.service.js", userRole);
+    console.log("USER_ID @ticket.service.js", userId);
+
     if (userRole === ROLES.ENGINEER) {
-      if (ticket.assignedTo?.toString() !== userId) {
+      if (ticket.assignedTo?.toString() !== userId?.toString()) {
         throw ApiError.forbidden(
           "You do not have permission to update this ticket"
         );
       }
 
-      const forbiddenFields = ["assignedTo", "status", "priority", "category"];
+      const forbiddenFields = ["assignedTo"];
       const attemptedForbiddenField = forbiddenFields.find(
         (field) => updateData[field] !== undefined
       );

@@ -249,12 +249,15 @@ class RoleService {
       );
     }
 
-    // Validate ticket types if provided
+    console.log("ALLOWED_TICKET_TYPES @role.service.js", allowedTicketTypes);
+
     if (allowedTicketTypes) {
       const validTicketTypes = [
+        "SERVICE",
         "INSTALLATION",
-        "REPAIR",
-        "MAINTENANCE",
+        "CHARGEABLE",
+        "IN_WARRANTY",
+        "OUT_OF_WARRANTY",
         "COMPLAINT",
         "DISPATCH",
       ];

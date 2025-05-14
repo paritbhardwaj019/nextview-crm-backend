@@ -4,6 +4,7 @@ const ApiResponse = require("../utils/apiResponse.util");
 const ApiError = require("../utils/apiError.util");
 const asyncHandler = require("../utils/asyncHandler.util");
 const Ticket = require("../models/ticket.model");
+const Customer = require("../models/customer.model");
 
 class TicketController {
   /**
@@ -28,16 +29,20 @@ class TicketController {
       sort = "-createdAt",
     } = req.query;
 
+    // Initialize query object for basic filters
     const query = {};
 
+    // Apply basic filters
     if (status) query.status = status;
     if (priority) query.priority = priority;
     if (category) query.category = category;
     if (assignedTo) query.assignedTo = assignedTo;
     if (itemId) query.itemId = itemId;
-    if (serialNumber) query.serialNumber = serialNumber;
     if (type) query.type = type;
-    if (req.user.role === "ENGINEER") query.assignedTo = req.user.id;
+
+    if (req.user.role === "ENGINEER") {
+      query.assignedTo = req.user.id;
+    }
 
     if (startDate || endDate) {
       query.createdAt = {};
@@ -45,13 +50,41 @@ class TicketController {
       if (endDate) query.createdAt.$lte = new Date(endDate);
     }
 
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-        { ticketId: { $regex: search, $options: "i" } },
-        { serialNumber: { $regex: search, $options: "i" } },
-      ];
+    if (search || serialNumber) {
+      let customerIds = [];
+
+      if (search) {
+        const matchingCustomers = await Customer.find({
+          $or: [
+            { name: { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } },
+            { mobile: { $regex: search, $options: "i" } },
+          ],
+        }).select("_id");
+
+        customerIds = matchingCustomers.map((customer) => customer._id);
+      }
+
+      // Build search query
+      const searchConditions = [];
+
+      if (serialNumber) {
+        // Add explicit serial number condition
+        query.serialNumber = { $regex: serialNumber, $options: "i" };
+      } else if (search) {
+        searchConditions.push(
+          { title: { $regex: search, $options: "i" } },
+          { description: { $regex: search, $options: "i" } },
+          { ticketId: { $regex: search, $options: "i" } },
+          { serialNumber: { $regex: search, $options: "i" } }
+        );
+
+        if (customerIds.length > 0) {
+          searchConditions.push({ customerId: { $in: customerIds } });
+        }
+
+        query.$or = searchConditions;
+      }
     }
 
     const sortOptions = {};
@@ -76,6 +109,7 @@ class TicketController {
         { path: "itemId", select: "name category sku" },
         {
           path: "customerId",
+          select: "name email mobile address city state pincode",
           populate: { path: "createdBy", select: "name email" },
         },
       ],
