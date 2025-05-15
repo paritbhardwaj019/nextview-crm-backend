@@ -34,7 +34,7 @@ class AuthMiddleware {
     });
   }
 
-  static requirePermission(permission) {
+  static requirePermission(...permissions) {
     return asyncHandler(async (req, res, next) => {
       try {
         const user = await User.findById(req.user.id);
@@ -53,9 +53,13 @@ class AuthMiddleware {
           throw ApiError.forbidden(`Role not found: ${user.role}`);
         }
 
-        if (!hasPermission(userRole.permissions, permission)) {
+        const hasAnyPermission = permissions.some((permission) =>
+          hasPermission(userRole.permissions, permission)
+        );
+
+        if (!hasAnyPermission) {
           throw ApiError.forbidden(
-            `Insufficient permissions: ${permission} is required`
+            `Insufficient permissions: One of [${permissions.join(", ")}] is required`
           );
         }
 

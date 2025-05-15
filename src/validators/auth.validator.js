@@ -80,9 +80,31 @@ const changePasswordSchema = Joi.object({
     }),
 });
 
+/**
+ * Validation schema for resetting password with token
+ */
+const resetPasswordWithTokenSchema = Joi.object({
+  token: Joi.string().required().messages({
+    "string.empty": "Token cannot be empty",
+    "any.required": "Token is required",
+  }),
+  password: Joi.string()
+    .required()
+    .min(8)
+    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .messages({
+      "string.empty": "Password cannot be empty",
+      "any.required": "Password is required",
+      "string.min": "Password must be at least 8 characters long",
+      "string.pattern.base":
+        "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+    }),
+});
+
 module.exports = {
   loginSchema,
   seedAdminSchema,
   resetPasswordSchema,
   changePasswordSchema,
+  resetPasswordWithTokenSchema,
 };

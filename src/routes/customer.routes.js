@@ -2,7 +2,7 @@ const express = require("express");
 const CustomerController = require("../controllers/customer.controller");
 const AuthMiddleware = require("../middlewares/auth.middleware");
 const { validateRequest } = require("../middlewares/validateReq.middleware");
-const { PERMISSIONS } = require("../config/roles");
+const { PERMISSIONS } = require("../config/permissions");
 const auditMiddleware = require("../middlewares/audit.middleware");
 const {
   customerSchema,
@@ -62,7 +62,10 @@ const router = express.Router();
 router.get(
   "/",
   AuthMiddleware.authenticate,
-  AuthMiddleware.requirePermission(PERMISSIONS.VIEW_USER),
+  AuthMiddleware.requirePermission(
+    PERMISSIONS.VIEW_CUSTOMERS,
+    PERMISSIONS.VIEW_ALL_CUSTOMERS
+  ),
   CustomerController.getAllCustomers
 );
 
@@ -97,7 +100,10 @@ router.get(
 router.get(
   "/search",
   AuthMiddleware.authenticate,
-  AuthMiddleware.requirePermission(PERMISSIONS.VIEW_USER),
+  AuthMiddleware.requirePermission(
+    PERMISSIONS.VIEW_CUSTOMERS,
+    PERMISSIONS.VIEW_ALL_CUSTOMERS
+  ),
   CustomerController.searchCustomers
 );
 
@@ -128,7 +134,10 @@ router.get(
 router.get(
   "/:id",
   AuthMiddleware.authenticate,
-  AuthMiddleware.requirePermission(PERMISSIONS.VIEW_USER),
+  AuthMiddleware.requirePermission(
+    PERMISSIONS.VIEW_CUSTOMERS,
+    PERMISSIONS.VIEW_ALL_CUSTOMERS
+  ),
   CustomerController.getCustomerById
 );
 
@@ -159,7 +168,10 @@ router.get(
 router.get(
   "/:id/records",
   AuthMiddleware.authenticate,
-  AuthMiddleware.requirePermission(PERMISSIONS.VIEW_USER),
+  AuthMiddleware.requirePermission(
+    PERMISSIONS.VIEW_CUSTOMERS,
+    PERMISSIONS.VIEW_ALL_CUSTOMERS
+  ),
   CustomerController.getCustomerRecords
 );
 
@@ -216,7 +228,10 @@ router.get(
 router.post(
   "/",
   AuthMiddleware.authenticate,
-  AuthMiddleware.requirePermission(PERMISSIONS.CREATE_USER),
+  AuthMiddleware.requirePermission(
+    PERMISSIONS.CREATE_CUSTOMERS,
+    PERMISSIONS.CREATE_NEW_CUSTOMER
+  ),
   auditMiddleware("Customer"),
   validateRequest(customerSchema),
   CustomerController.createCustomer
@@ -279,7 +294,7 @@ router.post(
 router.put(
   "/:id",
   AuthMiddleware.authenticate,
-  AuthMiddleware.requirePermission(PERMISSIONS.UPDATE_USER),
+  AuthMiddleware.requirePermission(PERMISSIONS.UPDATE_CUSTOMERS),
   auditMiddleware("Customer"),
   validateRequest(customerUpdateSchema),
   CustomerController.updateCustomer
@@ -312,7 +327,7 @@ router.put(
 router.delete(
   "/:id",
   AuthMiddleware.authenticate,
-  AuthMiddleware.requirePermission(PERMISSIONS.DELETE_USER),
+  AuthMiddleware.requirePermission(PERMISSIONS.DELETE_CUSTOMERS),
   auditMiddleware("Customer"),
   CustomerController.deleteCustomer
 );

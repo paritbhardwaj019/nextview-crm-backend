@@ -8,6 +8,7 @@ const {
   seedAdminSchema,
   resetPasswordSchema,
   changePasswordSchema,
+  resetPasswordWithTokenSchema,
 } = require("../validators/auth.validator");
 
 /**
@@ -215,41 +216,95 @@ router.post(
 
 /**
  * @swagger
- * /auth/reset-password:
+ * /auth/forgot-password:
  *   post:
- *     summary: Reset user password
- *     description: Send a password reset email with a temporary password
+ *     summary: Request password reset
+ *     description: Send a password reset link to the user's email
  *     tags: [Authentication]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/ResetPassword'
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address of the user requesting password reset
  *     responses:
  *       200:
  *         description: Password reset email sent successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 message:
- *                   type: string
- *                   example: Password reset email sent successfully
  *       400:
  *         description: Validation error
  *       404:
  *         description: User not found
  */
 router.post(
-  "/reset-password",
+  "/forgot-password",
   validateRequest(resetPasswordSchema),
+  AuthController.forgotPassword
+);
+
+/**
+ * @swagger
+ * /auth/reset-password:
+ *   post:
+ *     summary: Reset password with token
+ *     description: Reset user password using the token from email
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *               - password
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: Reset token received via email
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: New password to set
+ *     responses:
+ *       200:
+ *         description: Password has been reset successfully
+ *       400:
+ *         description: Invalid or expired token
+ */
+router.post(
+  "/reset-password",
+  validateRequest(resetPasswordWithTokenSchema),
   AuthController.resetPassword
 );
+
+/**
+ * @swagger
+ * /auth/verify-reset-token/{token}:
+ *   get:
+ *     summary: Verify reset token
+ *     description: Verify if the password reset token is valid
+ *     tags: [Authentication]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Reset token to verify
+ *     responses:
+ *       200:
+ *         description: Token is valid
+ *       400:
+ *         description: Invalid or expired token
+ */
+router.get("/verify-reset-token/:token", AuthController.verifyResetToken);
 
 /**
  * @swagger

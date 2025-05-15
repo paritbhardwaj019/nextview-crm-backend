@@ -54,16 +54,42 @@ class AuthController {
   });
 
   /**
-   * Reset user password
-   * @route POST /api/auth/reset-password
+   * Request password reset
+   * @route POST /api/auth/forgot-password
    * @access Public
    */
-  static resetPassword = asyncHandler(async (req, res) => {
+  static forgotPassword = asyncHandler(async (req, res) => {
     const { email } = req.body;
 
     await AuthService.resetPassword(email);
 
     return ApiResponse.success(res, "Password reset email sent successfully");
+  });
+
+  /**
+   * Reset password with token
+   * @route POST /api/auth/reset-password
+   * @access Public
+   */
+  static resetPassword = asyncHandler(async (req, res) => {
+    const { token, password } = req.body;
+
+    await AuthService.setNewPassword(token, password);
+
+    return ApiResponse.success(res, "Password has been reset successfully");
+  });
+
+  /**
+   * Verify reset token
+   * @route GET /api/auth/verify-reset-token/:token
+   * @access Public
+   */
+  static verifyResetToken = asyncHandler(async (req, res) => {
+    const { token } = req.params;
+
+    await AuthService.verifyResetToken(token);
+
+    return ApiResponse.success(res, "Reset token is valid");
   });
 
   /**

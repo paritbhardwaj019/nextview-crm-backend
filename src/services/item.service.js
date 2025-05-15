@@ -1,4 +1,5 @@
 const Item = require("../models/item.model");
+const Ticket = require("../models/ticket.model");
 const ApiError = require("../utils/apiError.util");
 const XLSX = require("xlsx");
 
@@ -50,7 +51,8 @@ class ItemService {
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email")
       .populate("inventory.updatedBy", "name email")
-      .populate("transactions.performedBy", "name email");
+      .populate("transactions.performedBy", "name email")
+      .populate("transactions.ticketId", "ticketId");
 
     if (!item) {
       throw ApiError.notFound("Item not found");
@@ -205,7 +207,7 @@ class ItemService {
    * Process inventory transaction (inward or outward)
    */
   static async processInventoryTransaction(id, transactionData, userId) {
-    const { type, condition, quantity, reference, notes, docketNumber } =
+    const { type, condition, quantity, ticketId, notes, docketNumber } =
       transactionData;
 
     if (!type || !condition || !quantity) {
@@ -216,6 +218,13 @@ class ItemService {
 
     if (quantity <= 0) {
       throw ApiError.badRequest("Transaction quantity must be positive");
+    }
+
+    // For outward transactions, validate ticket
+    if (type === "OUTWARD" && !ticketId) {
+      throw ApiError.badRequest(
+        "Ticket ID is required for outward transactions"
+      );
     }
 
     const item = await this.getItemById(id);
@@ -241,7 +250,7 @@ class ItemService {
       type,
       condition,
       quantity,
-      reference: reference || "",
+      ticketId: type === "OUTWARD" ? ticketId : undefined,
       notes: notes || "",
       performedBy: userId,
       performedAt: new Date(),
@@ -264,6 +273,27 @@ class ItemService {
         );
       }
       inventoryEntry.quantity -= quantity;
+
+      // Update ticket status to RESOLVED
+      const ticket = await Ticket.findById(ticketId);
+      if (!ticket) {
+        throw ApiError.notFound("Selected ticket not found");
+      }
+
+      // Update ticket status and add a comment about the dispatch
+      ticket.status = "RESOLVED";
+      ticket.resolvedBy = userId;
+      ticket.resolvedAt = new Date();
+
+      // Add a comment about the dispatch
+      ticket.comments.push({
+        comment: `Item dispatched: ${item.name} (${quantity} units, ${condition})${docketNumber ? ` - Docket: ${docketNumber}` : ""}`,
+        createdBy: userId,
+        createdAt: new Date(),
+        isInternal: true,
+      });
+
+      await ticket.save();
     } else {
       throw ApiError.badRequest("Invalid transaction type");
     }
@@ -436,7 +466,9 @@ class ItemService {
         category: 1,
         "transactions.$": 1,
       }
-    ).populate("transactions.performedBy", "name email");
+    )
+      .populate("transactions.performedBy", "name email")
+      .populate("transactions.ticketId", "ticketId");
 
     if (!item || !item.transactions || item.transactions.length === 0) {
       throw ApiError.notFound("Transaction not found");

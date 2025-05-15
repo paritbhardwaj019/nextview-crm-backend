@@ -51,7 +51,10 @@ const router = express.Router();
 router.get(
   "/",
   AuthMiddleware.authenticate,
-  AuthMiddleware.requirePermission(PERMISSIONS.VIEW_USER),
+  AuthMiddleware.requirePermission(
+    PERMISSIONS.VIEW_USER,
+    PERMISSIONS.ASSIGN_TICKET
+  ),
   UserController.getAllUsers
 );
 

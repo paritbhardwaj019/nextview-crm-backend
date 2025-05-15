@@ -17,13 +17,6 @@ class UserController {
 
     const query = {};
 
-    if (role) {
-      if (userRole === ROLES.SUPPORT_MANAGER && role !== ROLES.ENGINEER) {
-        throw ApiError.forbidden("Support Managers can only view engineers");
-      }
-      query.role = role;
-    }
-
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: "i" } },
@@ -54,8 +47,6 @@ class UserController {
       details: `Retrieved list of users`,
       ipAddress: req.ip,
     });
-
-    console.log("USER_RESULTS @user.controller.js", users.results);
 
     return ApiResponse.withPagination(
       res,

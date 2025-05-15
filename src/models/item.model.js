@@ -40,9 +40,9 @@ const inventoryTransactionSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-  reference: {
-    type: String,
-    trim: true,
+  ticketId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Ticket",
   },
   notes: {
     type: String,
@@ -157,7 +157,6 @@ itemSchema.pre("save", function (next) {
 itemSchema.index({ name: 1 });
 itemSchema.index({ category: 1 });
 itemSchema.index({ status: 1 });
-itemSchema.index({ sku: 1 });
 itemSchema.index({ mainHeaderKey: 1 });
 itemSchema.index({ "inventory.condition": 1 });
 itemSchema.index({ quantity: 1 });

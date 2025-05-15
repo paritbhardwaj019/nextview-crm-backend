@@ -8,6 +8,7 @@ const { notify } = require("./notification.service");
 const { uploadToCloudinary } = require("../middlewares/cloudinary.middleware");
 const Customer = require("../models/customer.model");
 const NotificationService = require("./notification.service");
+const Role = require("../models/role.model");
 
 class TicketService {
   /**
@@ -145,7 +146,7 @@ class TicketService {
 
     const ticketData = {
       title: formData.title,
-      description: formData.description,
+      description: formData.description || "",
       priority: formData.priority || "MEDIUM",
       category: formData.category || "OTHER",
       ticketId: formData.ticketNumber,
@@ -908,7 +909,6 @@ class TicketService {
       throw ApiError.notFound("Ticket not found");
     }
 
-    // Verify the user being assigned exists and is active
     const assignToUser = await User.findById(assignToUserId);
     if (!assignToUser) {
       throw ApiError.notFound("User to assign ticket to not found");
@@ -918,25 +918,13 @@ class TicketService {
       throw ApiError.badRequest("Cannot assign ticket to inactive user");
     }
 
-    // Check if the user has appropriate role to be assigned tickets
-    if (
-      assignToUser.role !== ROLES.ENGINEER &&
-      assignToUser.role !== ROLES.SUPPORT_MANAGER &&
-      assignToUser.role !== ROLES.SUPER_ADMIN
-    ) {
-      throw ApiError.badRequest(
-        "Tickets can only be assigned to Engineers, Support Managers, or Super Admins"
-      );
+    const loggedInUser = await User.findById(assignedByUserId);
+    const loggedInUserRole = await Role.findOne({ code: loggedInUser.role });
+
+    if (!loggedInUserRole.permissions.includes(PERMISSIONS.ASSIGN_TICKET)) {
+      throw ApiError.forbidden("You do not have permission to assign tickets");
     }
 
-    // Only Super Admin or Support Manager can assign tickets
-    if (userRole !== ROLES.SUPER_ADMIN && userRole !== ROLES.SUPPORT_MANAGER) {
-      throw ApiError.forbidden(
-        "Only Super Admins and Support Managers can assign tickets"
-      );
-    }
-
-    // Create assignment record
     const assignmentRecord = {
       assignedTo: assignToUserId,
       assignedBy: assignedByUserId,
@@ -944,24 +932,20 @@ class TicketService {
       notes: notes,
     };
 
-    // Initialize or update assignment history
     if (!ticket.assignmentHistory) {
       ticket.assignmentHistory = [];
     }
 
     ticket.assignmentHistory.push(assignmentRecord);
 
-    // Update current assignment
     ticket.assignedTo = assignToUserId;
     ticket.assignedBy = assignedByUserId;
     ticket.assignedAt = new Date();
 
-    // Update status if not already in progress
     if (ticket.status === "OPEN") {
       ticket.status = "ASSIGNED";
     }
 
-    // Record in history
     const historyEntry = {
       action: "ASSIGNED",
       performedBy: assignedByUserId,

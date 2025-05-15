@@ -13,6 +13,12 @@ const PERMISSIONS = {
   UPDATE_USER: "update_user",
   DELETE_USER: "delete_user",
 
+  // Customer Management
+  VIEW_CUSTOMERS: "view_customers",
+  CREATE_CUSTOMERS: "create_customers",
+  UPDATE_CUSTOMERS: "update_customers",
+  DELETE_CUSTOMERS: "delete_customers",
+
   // Role Management
   CREATE_ROLE: "create_role",
   UPDATE_ROLE: "update_role",
@@ -28,6 +34,14 @@ const PERMISSIONS = {
   ASSIGN_TICKET: "assign_ticket",
   RESOLVE_TICKET: "resolve_ticket",
   APPROVE_TICKET: "approve_ticket",
+  VIEW_ALL_CUSTOMERS: "view_all_customers",
+  CREATE_NEW_CUSTOMER: "create_new_customer",
+
+  // Problem Management
+  CREATE_PROBLEM: "create_problem",
+  UPDATE_PROBLEM: "update_problem",
+  DELETE_PROBLEM: "delete_problem",
+  VIEW_PROBLEM: "view_problem",
 
   // Installation Management
   CREATE_INSTALLATION: "create_installation",
@@ -45,13 +59,6 @@ const PERMISSIONS = {
   IMPORT_ITEMS: "import_items",
   MANAGE_INVENTORY: "manage_inventory",
 
-  // Dispatch Management
-  CREATE_DISPATCH: "create_dispatch",
-  UPDATE_DISPATCH: "update_dispatch",
-  VIEW_DISPATCH: "view_dispatch",
-  MANAGE_SHIPMENTS: "manage_shipments",
-  TRACK_DELIVERY: "track_delivery",
-
   // System Settings
   MANAGE_SETTINGS: "manage_settings",
   VIEW_SETTINGS: "view_settings",
@@ -59,7 +66,6 @@ const PERMISSIONS = {
   VIEW_ACTIVITY_LOGS: "view_activity_logs",
 
   VIEW_DASHBOARD: "view_dashboard",
-  VIEW_PROBLEM: "view_problem",
   VIEW_CUSTOMER: "view_customer",
   VIEW_LOG: "view_log",
   VIEW_ROLE: "view_role",
@@ -78,6 +84,15 @@ const PERMISSION_GROUPS = {
       PERMISSIONS.UPDATE_USER,
       PERMISSIONS.DELETE_USER,
       PERMISSIONS.VIEW_USER,
+    ],
+  },
+  CUSTOMER_MANAGEMENT: {
+    name: "Customer Management",
+    permissions: [
+      PERMISSIONS.VIEW_CUSTOMERS,
+      PERMISSIONS.CREATE_CUSTOMERS,
+      PERMISSIONS.UPDATE_CUSTOMERS,
+      PERMISSIONS.DELETE_CUSTOMERS,
     ],
   },
   ROLE_MANAGEMENT: {
@@ -100,6 +115,17 @@ const PERMISSION_GROUPS = {
       PERMISSIONS.ASSIGN_TICKET,
       PERMISSIONS.RESOLVE_TICKET,
       PERMISSIONS.APPROVE_TICKET,
+      PERMISSIONS.VIEW_ALL_CUSTOMERS,
+      PERMISSIONS.CREATE_NEW_CUSTOMER,
+    ],
+  },
+  PROBLEM_MANAGEMENT: {
+    name: "Problem Management",
+    permissions: [
+      PERMISSIONS.CREATE_PROBLEM,
+      PERMISSIONS.UPDATE_PROBLEM,
+      PERMISSIONS.DELETE_PROBLEM,
+      PERMISSIONS.VIEW_PROBLEM,
     ],
   },
   INSTALLATION_MANAGEMENT: {
@@ -124,16 +150,6 @@ const PERMISSION_GROUPS = {
       PERMISSIONS.MANAGE_INVENTORY,
     ],
   },
-  DISPATCH_MANAGEMENT: {
-    name: "Dispatch Management",
-    permissions: [
-      PERMISSIONS.CREATE_DISPATCH,
-      PERMISSIONS.UPDATE_DISPATCH,
-      PERMISSIONS.VIEW_DISPATCH,
-      PERMISSIONS.MANAGE_SHIPMENTS,
-      PERMISSIONS.TRACK_DELIVERY,
-    ],
-  },
   SYSTEM_SETTINGS: {
     name: "System Settings",
     permissions: [
@@ -155,6 +171,12 @@ const PERMISSION_NAMES = {
   delete_user: "Delete User",
   view_user: "View User",
 
+  // Customer Management
+  view_customers: "View Customers",
+  create_customers: "Create Customers",
+  update_customers: "Update Customers",
+  delete_customers: "Delete Customers",
+
   // Role Management
   create_role: "Create Role",
   update_role: "Update Role",
@@ -170,6 +192,14 @@ const PERMISSION_NAMES = {
   assign_ticket: "Assign Ticket",
   resolve_ticket: "Resolve Ticket",
   approve_ticket: "Approve Ticket",
+  view_all_customers: "View All Customers",
+  create_new_customer: "Create New Customer",
+
+  // Problem Management
+  create_problem: "Create Problem",
+  update_problem: "Update Problem",
+  delete_problem: "Delete Problem",
+  view_problem: "View Problem",
 
   // Installation Management
   create_installation: "Create Installation",
@@ -186,13 +216,6 @@ const PERMISSION_NAMES = {
   view_item: "View Item",
   import_items: "Import Items",
   manage_inventory: "Manage Inventory",
-
-  // Dispatch Management
-  create_dispatch: "Create Dispatch",
-  update_dispatch: "Update Dispatch",
-  view_dispatch: "View Dispatch",
-  manage_shipments: "Manage Shipments",
-  track_delivery: "Track Delivery",
 
   // System Settings
   manage_settings: "Manage Settings",
@@ -217,6 +240,10 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.VIEW_TICKET,
     PERMISSIONS.ASSIGN_TICKET,
     PERMISSIONS.APPROVE_TICKET,
+    PERMISSIONS.CREATE_PROBLEM,
+    PERMISSIONS.UPDATE_PROBLEM,
+    PERMISSIONS.VIEW_PROBLEM,
+    PERMISSIONS.DELETE_PROBLEM,
     PERMISSIONS.CREATE_INSTALLATION,
     PERMISSIONS.UPDATE_INSTALLATION,
     PERMISSIONS.VIEW_INSTALLATION,
@@ -226,6 +253,8 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.VIEW_ITEM,
     PERMISSIONS.IMPORT_ITEMS,
     PERMISSIONS.VIEW_SETTINGS,
+    PERMISSIONS.VIEW_ALL_CUSTOMERS,
+    PERMISSIONS.CREATE_NEW_CUSTOMER,
   ],
 
   ENGINEER: [
@@ -233,10 +262,12 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.VIEW_TICKET,
     PERMISSIONS.UPDATE_TICKET,
     PERMISSIONS.RESOLVE_TICKET,
+    PERMISSIONS.VIEW_PROBLEM,
     PERMISSIONS.VIEW_INSTALLATION,
     PERMISSIONS.UPDATE_INSTALLATION,
     PERMISSIONS.COMPLETE_INSTALLATION,
     PERMISSIONS.VIEW_ITEM,
+    PERMISSIONS.VIEW_ALL_CUSTOMERS,
   ],
 
   INVENTORY_MANAGER: [
@@ -248,21 +279,9 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.IMPORT_ITEMS,
     PERMISSIONS.MANAGE_INVENTORY,
     PERMISSIONS.VIEW_TICKET,
+    PERMISSIONS.VIEW_PROBLEM,
     PERMISSIONS.VIEW_INSTALLATION,
-    PERMISSIONS.VIEW_DISPATCH,
-  ],
-
-  DISPATCH_MANAGER: [
-    PERMISSIONS.VIEW_USER,
-    PERMISSIONS.VIEW_ITEM,
-    PERMISSIONS.CREATE_DISPATCH,
-    PERMISSIONS.UPDATE_DISPATCH,
-    PERMISSIONS.VIEW_DISPATCH,
-    PERMISSIONS.MANAGE_SHIPMENTS,
-    PERMISSIONS.TRACK_DELIVERY,
-    PERMISSIONS.VIEW_TICKET,
-    PERMISSIONS.VIEW_INSTALLATION,
-    PERMISSIONS.MANAGE_INVENTORY,
+    PERMISSIONS.VIEW_ALL_CUSTOMERS,
   ],
 };
 

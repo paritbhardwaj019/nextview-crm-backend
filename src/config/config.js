@@ -7,6 +7,7 @@ const config = {
     port: process.env.PORT,
     baseUrl: process.env.BASE_URL,
     apiPrefix: process.env.API_PREFIX,
+    frontendUrl: process.env.FRONTEND_URL,
   },
   db: {
     uri: process.env.MONGODB_URI,

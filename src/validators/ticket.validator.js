@@ -10,10 +10,8 @@ const createTicketSchema = Joi.object({
     "string.max": "Title cannot exceed 100 characters",
     "any.required": "Title is required",
   }),
-  description: Joi.string().required().min(10).messages({
-    "string.empty": "Description is required",
-    "string.min": "Description must be at least 10 characters long",
-    "any.required": "Description is required",
+  description: Joi.string().min(10).allow(null, "").messages({
+    "string.min": "Description must be at least 10 characters long if provided",
   }),
   priority: Joi.string()
     .valid("LOW", "MEDIUM", "HIGH", "CRITICAL")
@@ -81,8 +79,8 @@ const updateTicketSchema = Joi.object({
     "string.min": "Title must be at least 5 characters long",
     "string.max": "Title cannot exceed 100 characters",
   }),
-  description: Joi.string().min(10).messages({
-    "string.min": "Description must be at least 10 characters long",
+  description: Joi.string().min(10).allow(null, "").messages({
+    "string.min": "Description must be at least 10 characters long if provided",
   }),
   priority: Joi.string().valid("LOW", "MEDIUM", "HIGH", "CRITICAL").messages({
     "any.only": "Priority must be one of: LOW, MEDIUM, HIGH, CRITICAL",
@@ -253,6 +251,39 @@ const processFileUploads = (fieldName = "attachments") => {
   };
 };
 
+/**
+ * Schema for inventory transaction
+ */
+const inventoryTransactionSchema = Joi.object({
+  type: Joi.string().valid("INWARD", "OUTWARD").required().messages({
+    "any.only": "Transaction type must be either INWARD or OUTWARD",
+    "any.required": "Transaction type is required",
+  }),
+  condition: Joi.string()
+    .valid("NEW", "REPARABLE", "REPAIRED")
+    .required()
+    .messages({
+      "any.only": "Condition must be one of: NEW, REPARABLE, REPAIRED",
+      "any.required": "Condition is required",
+    }),
+  quantity: Joi.number().integer().positive().required().messages({
+    "number.base": "Quantity must be a number",
+    "number.integer": "Quantity must be an integer",
+    "number.positive": "Quantity must be positive",
+    "any.required": "Quantity is required",
+  }),
+  ticketId: Joi.string().when("type", {
+    is: "OUTWARD",
+    then: Joi.string().required().messages({
+      "string.empty": "Ticket ID is required for outward transactions",
+      "any.required": "Ticket ID is required for outward transactions",
+    }),
+    otherwise: Joi.string().allow(null, ""),
+  }),
+  notes: Joi.string().allow("", null),
+  docketNumber: Joi.string().allow("", null),
+}).unknown(true);
+
 module.exports = {
   createTicketSchema,
   updateTicketSchema,
@@ -261,4 +292,5 @@ module.exports = {
   attachmentsSchema,
   formatFileUploads,
   processFileUploads,
+  inventoryTransactionSchema,
 };

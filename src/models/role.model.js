@@ -146,7 +146,6 @@ roleSchema.statics.createDefaultRoles = async function () {
     if (existingRole) {
       let needsUpdate = false;
 
-      // For Super Admin, ensure it has all permissions
       if (role.code === "SUPER_ADMIN") {
         const missingPermissions = allPermissions.filter(
           (permission) => !existingRole.permissions.includes(permission)
@@ -162,7 +161,6 @@ roleSchema.statics.createDefaultRoles = async function () {
           needsUpdate = true;
         }
       } else {
-        // For other roles, check for new permissions from ROLE_PERMISSIONS
         const newPermissions = role.permissions.filter(
           (permission) => !existingRole.permissions.includes(permission)
         );
@@ -178,7 +176,6 @@ roleSchema.statics.createDefaultRoles = async function () {
         }
       }
 
-      // Check for allowedTicketTypes updates
       if (
         JSON.stringify(existingRole.allowedTicketTypes) !==
         JSON.stringify(role.allowedTicketTypes)

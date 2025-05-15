@@ -96,16 +96,50 @@ class AuthService {
       throw ApiError.notFound("User not found");
     }
 
-    const tempPassword = crypto.randomBytes(8).toString("hex");
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenExpiry = new Date(Date.now() + 3600000);
 
-    user.password = tempPassword;
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = resetTokenExpiry;
     await user.save();
 
+    const resetUrl = `${config.app.frontendUrl}/reset-password/${resetToken}`;
     await sendEmail({
       to: user.email,
-      subject: "Password Reset",
-      text: `Your temporary password is: ${tempPassword}. Please change it after logging in.`,
+      subject: "Password Reset Request",
+      text: `You are receiving this because you (or someone else) has requested the reset of the password for your account.\n\n
+      Please click on the following link, or paste this into your browser to complete the process:\n\n
+      ${resetUrl}\n\n
+      If you did not request this, please ignore this email and your password will remain unchanged.\n`,
     });
+
+    return true;
+  }
+
+  static async verifyResetToken(token) {
+    console.log("TOKEN @auth.service.js", token);
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      throw ApiError.badRequest(
+        "Password reset token is invalid or has expired"
+      );
+    }
+
+    return user;
+  }
+
+  static async setNewPassword(token, newPassword) {
+    const user = await this.verifyResetToken(token);
+
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
 
     return true;
   }

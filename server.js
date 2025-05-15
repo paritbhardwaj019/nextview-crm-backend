@@ -7,7 +7,6 @@ const { initReportCronJobs } = require("./src/cron/reportCron");
 
 const PORT = config.app.port;
 
-// Default values for ticket settings
 const DEFAULT_SETTINGS = {
   autoApproval: false,
   autoApprovalRoles: [],
@@ -24,7 +23,6 @@ const DEFAULT_SETTINGS = {
   reopenWindowDays: 30,
 };
 
-// Seed function for ticket settings
 const seedTicketSettings = async () => {
   try {
     console.log("Checking ticket settings...");
@@ -122,38 +120,6 @@ const seedDefaultRoles = async () => {
           ],
           isDefault: true,
         },
-        {
-          name: "Support Manager",
-          code: "SUPPORT_MANAGER",
-          description: "Manages support tickets and engineers",
-          permissions: rolePermissions.SUPPORT_MANAGER || [],
-          allowedTicketTypes: ["SERVICE", "INSTALLATION", "CHARGEABLE"],
-          isDefault: true,
-        },
-        {
-          name: "Engineer",
-          code: "ENGINEER",
-          description: "Handles technical support and installations",
-          permissions: rolePermissions.ENGINEER || [],
-          allowedTicketTypes: ["SERVICE", "INSTALLATION", "CHARGEABLE"],
-          isDefault: true,
-        },
-        {
-          name: "Inventory Manager",
-          code: "INVENTORY_MANAGER",
-          description: "Manages inventory and stock levels",
-          permissions: rolePermissions.INVENTORY_MANAGER || [],
-          allowedTicketTypes: ["SERVICE", "INSTALLATION", "CHARGEABLE"],
-          isDefault: true,
-        },
-        {
-          name: "Dispatch Manager",
-          code: "DISPATCH_MANAGER",
-          description: "Manages shipping and deliveries",
-          permissions: rolePermissions.DISPATCH_MANAGER || [],
-          allowedTicketTypes: ["DISPATCH"],
-          isDefault: true,
-        },
       ];
 
       for (const defaultRole of defaultRoles) {
@@ -162,7 +128,6 @@ const seedDefaultRoles = async () => {
         if (existingRole) {
           let needsUpdate = false;
 
-          // Check for missing permissions
           if (defaultRole.code === "SUPER_ADMIN") {
             const missingPermissions = allPermissions.filter(
               (permission) => !existingRole.permissions.includes(permission)
@@ -231,27 +196,21 @@ const seedDefaultRoles = async () => {
   }
 };
 
-// Connect to MongoDB
 mongoose
   .connect(config.db.uri, config.db.options)
   .then(async () => {
     console.log("Connected to MongoDB");
 
-    // Seed ticket settings
     await seedTicketSettings();
 
-    // Seed default roles
     await seedDefaultRoles();
 
-    // Initialize report cron jobs
     initReportCronJobs();
 
-    // Start the server
     const server = app.listen(PORT, () => {
       console.log(`Server running in ${config.app.env} mode on port ${PORT}`);
     });
 
-    // Handle unhandled promise rejections
     process.on("unhandledRejection", (err) => {
       console.error("UNHANDLED REJECTION! Shutting down...");
       console.error(err.name, err.message);
@@ -270,7 +229,6 @@ mongoose
       process.exit(1);
     });
 
-    // Handle SIGTERM signal
     process.on("SIGTERM", () => {
       console.log("SIGTERM received. Shutting down gracefully");
 
