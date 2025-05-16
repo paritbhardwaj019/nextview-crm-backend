@@ -85,7 +85,13 @@ class ItemService {
    * Create a new item with inventory details
    */
   static async createItem(itemData, userId) {
-    const { name, sku, inventory = [], notificationThreshold = 10 } = itemData;
+    const {
+      name,
+      sku,
+      inventory = [],
+      notificationThreshold = 10,
+      warrantyInDays = 0,
+    } = itemData;
 
     // Check if SKU already exists (if provided)
     if (sku) {
@@ -105,6 +111,7 @@ class ItemService {
     const item = await Item.create({
       ...itemData,
       quantity: totalQuantity,
+      warrantyInDays: Math.round(warrantyInDays), // Ensure warranty is stored as days
       inventory: inventory.map((stock) => ({
         ...stock,
         updatedBy: userId,
@@ -150,6 +157,11 @@ class ItemService {
       if (existingItem) {
         throw ApiError.conflict("Item with this SKU already exists");
       }
+    }
+
+    // Convert warranty to days if provided
+    if (updateData.warrantyInDays !== undefined) {
+      updateData.warrantyInDays = Math.round(updateData.warrantyInDays);
     }
 
     // Handle inventory updates separately
@@ -207,8 +219,15 @@ class ItemService {
    * Process inventory transaction (inward or outward)
    */
   static async processInventoryTransaction(id, transactionData, userId) {
-    const { type, condition, quantity, ticketId, notes, docketNumber } =
-      transactionData;
+    const {
+      type,
+      condition,
+      quantity,
+      ticketId,
+      notes,
+      docketNumber,
+      reference,
+    } = transactionData;
 
     if (!type || !condition || !quantity) {
       throw ApiError.badRequest(
@@ -224,6 +243,13 @@ class ItemService {
     if (type === "OUTWARD" && !ticketId) {
       throw ApiError.badRequest(
         "Ticket ID is required for outward transactions"
+      );
+    }
+
+    // For inward transactions, validate reference
+    if (type === "INWARD" && !reference) {
+      throw ApiError.badRequest(
+        "Reference is required for inward transactions"
       );
     }
 
@@ -250,7 +276,8 @@ class ItemService {
       type,
       condition,
       quantity,
-      ticketId: type === "OUTWARD" ? ticketId : undefined,
+      ticketId: ticketId || undefined, // Allow ticketId for both inward and outward
+      reference: type === "INWARD" ? reference : undefined,
       notes: notes || "",
       performedBy: userId,
       performedAt: new Date(),

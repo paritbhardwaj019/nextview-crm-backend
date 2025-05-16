@@ -9,6 +9,7 @@ const { uploadToCloudinary } = require("../middlewares/cloudinary.middleware");
 const Customer = require("../models/customer.model");
 const NotificationService = require("./notification.service");
 const Role = require("../models/role.model");
+const ExcelJS = require("exceljs");
 
 class TicketService {
   /**
@@ -1286,6 +1287,107 @@ class TicketService {
         });
       }
     }
+  }
+
+  /**
+   * Export tickets to Excel format
+   * @param {Object} filters - Filter parameters for tickets
+   * @param {String} userId - ID of the user making the request
+   * @param {String} userRole - Role of the user making the request
+   * @returns {Promise<Buffer>} - Excel file buffer
+   */
+  static async exportTickets(filters, userId, userRole) {
+    const { startDate, endDate, status } = filters;
+
+    // Build query
+    const query = {};
+
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) query.createdAt.$lte = new Date(endDate);
+    }
+
+    if (status) {
+      query.status = status;
+    }
+
+    // Apply role-based filtering
+    if (userRole === ROLES.ENGINEER) {
+      query.$or = [{ assignedTo: userId }, { createdBy: userId }];
+    }
+
+    // Get tickets with populated fields
+    const tickets = await Ticket.find(query)
+      .populate("createdBy", "name email")
+      .populate("assignedTo", "name email")
+      .populate("customerId", "name email mobile")
+      .populate("itemId", "name category sku")
+      .sort({ createdAt: -1 });
+
+    // Create workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Tickets");
+
+    // Define columns
+    worksheet.columns = [
+      { header: "TICKET ID", key: "ticketId", width: 15 },
+      { header: "CUSTOMER", key: "customer", width: 30 },
+      { header: "ITEM", key: "item", width: 30 },
+      { header: "SERIAL NUMBER", key: "serialNumber", width: 20 },
+      { header: "STATUS", key: "status", width: 15 },
+      { header: "PRIORITY", key: "priority", width: 15 },
+      { header: "TYPE", key: "type", width: 15 },
+      { header: "ASSIGNED TO", key: "assignedTo", width: 25 },
+      { header: "CREATED AT", key: "createdAt", width: 25 },
+    ];
+
+    // Style the header row
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFE0E0E0" },
+    };
+
+    // Add data rows
+    tickets.forEach((ticket) => {
+      worksheet.addRow({
+        ticketId: ticket.ticketId || ticket._id.toString().substring(0, 8),
+        customer: ticket.customerId ? ticket.customerId.name : "—",
+        item: ticket.itemId ? ticket.itemId.name : ticket.modelNumber || "—",
+        serialNumber: ticket.serialNumber || "—",
+        status: ticket.status.replace(/_/g, " "),
+        priority: ticket.priority,
+        type: ticket.type || "—",
+        assignedTo: ticket.assignedTo ? ticket.assignedTo.name : "—",
+        createdAt: new Date(ticket.createdAt).toLocaleString("en-US", {
+          year: "numeric",
+          month: "numeric",
+          day: "numeric",
+          hour: "numeric",
+          minute: "numeric",
+          hour12: true,
+        }),
+      });
+    });
+
+    // Style the data rows
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+        });
+      }
+    });
+
+    // Generate buffer
+    return await workbook.xlsx.writeBuffer();
   }
 }
 

@@ -44,6 +44,11 @@ const inventoryTransactionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Ticket",
   },
+  reference: {
+    type: String,
+    enum: ["PURCHASE", "RETURN", "REPAIR", "OTHER", ""],
+    default: "",
+  },
   notes: {
     type: String,
     trim: true,
@@ -90,6 +95,11 @@ const itemSchema = new mongoose.Schema(
       min: 0,
     },
     price: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    warrantyInDays: {
       type: Number,
       default: 0,
       min: 0,

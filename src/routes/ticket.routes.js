@@ -25,6 +25,52 @@ const router = express.Router();
 
 /**
  * @swagger
+ * /api/tickets/export:
+ *   get:
+ *     summary: Export tickets to Excel
+ *     description: Export tickets to Excel format with filtering options
+ *     tags: [Tickets]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date for filtering tickets
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date for filtering tickets
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [OPEN, ASSIGNED, IN_PROGRESS, PENDING_APPROVAL, RESOLVED, CLOSED, REOPENED]
+ *         description: Filter by status
+ *     responses:
+ *       200:
+ *         description: Excel file containing tickets data
+ *         content:
+ *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       401:
+ *         description: Unauthorized
+ */
+router.get(
+  "/export",
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requirePermission(PERMISSIONS.VIEW_TICKET),
+  TicketController.exportTickets
+);
+
+/**
+ * @swagger
  * /api/tickets:
  *   get:
  *     summary: Get all tickets

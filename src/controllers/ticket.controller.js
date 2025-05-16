@@ -5,6 +5,7 @@ const ApiError = require("../utils/apiError.util");
 const asyncHandler = require("../utils/asyncHandler.util");
 const Ticket = require("../models/ticket.model");
 const Customer = require("../models/customer.model");
+const { ROLES } = require("../config/roles");
 
 class TicketController {
   /**
@@ -611,6 +612,39 @@ class TicketController {
       updatedTicket
     );
   });
+
+  /**
+   * Export tickets to Excel
+   * @route GET /api/tickets/export
+   * @access Private
+   */
+  static async exportTickets(req, res, next) {
+    try {
+      const { startDate, endDate, status } = req.query;
+      const userId = req.user.id;
+      const userRole = req.user.role;
+
+      const buffer = await TicketService.exportTickets(
+        { startDate, endDate, status },
+        userId,
+        userRole
+      );
+
+      // Set response headers for Excel file download
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=tickets-export.xlsx"
+      );
+
+      res.send(buffer);
+    } catch (error) {
+      next(new ApiError(error.message, error.statusCode));
+    }
+  }
 }
 
 module.exports = TicketController;
