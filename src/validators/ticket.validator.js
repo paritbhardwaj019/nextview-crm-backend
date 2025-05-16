@@ -69,6 +69,12 @@ const createTicketSchema = Joi.object({
       }),
     })
   ),
+  problems: Joi.array()
+    .items(Joi.string().pattern(/^[0-9a-fA-F]{24}$/))
+    .messages({
+      "string.pattern.base": "Each problem must be a valid ObjectId",
+    })
+    .default([]),
 }).unknown(true); // Allow unknown fields
 
 /**
@@ -127,6 +133,11 @@ const updateTicketSchema = Joi.object({
       size: Joi.number().integer().positive(),
     })
   ),
+  problems: Joi.array()
+    .items(Joi.string().pattern(/^[0-9a-fA-F]{24}$/))
+    .messages({
+      "string.pattern.base": "Each problem must be a valid ObjectId",
+    }),
 }).unknown(true); // Allow unknown fields
 
 /**

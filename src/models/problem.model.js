@@ -22,6 +22,9 @@ const mongoose = require("mongoose");
  *           type: string
  *           enum: [MINOR, MAJOR]
  *           description: Category of the problem
+ *         ticketCount:
+ *           type: number
+ *           description: Number of tickets associated with this problem
  *         createdBy:
  *           type: string
  *           description: User ID who created the problem
@@ -53,6 +56,10 @@ const problemSchema = new mongoose.Schema(
       enum: ["MINOR", "MAJOR"],
       default: "MINOR",
     },
+    ticketCount: {
+      type: Number,
+      default: 0,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -68,6 +75,15 @@ const problemSchema = new mongoose.Schema(
 problemSchema.index({ name: 1 });
 problemSchema.index({ category: 1 });
 problemSchema.index({ createdAt: -1 });
+problemSchema.index({ ticketCount: 1 });
+
+// Method to update ticket count
+problemSchema.methods.updateTicketCount = async function () {
+  const Ticket = mongoose.model("Ticket");
+  const count = await Ticket.countDocuments({ problems: this._id });
+  this.ticketCount = count;
+  return this.save();
+};
 
 const PaginationPlugin = require("../plugins/paginate.plugin");
 PaginationPlugin.enhanceSchema(problemSchema);

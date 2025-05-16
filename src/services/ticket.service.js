@@ -10,6 +10,7 @@ const Customer = require("../models/customer.model");
 const NotificationService = require("./notification.service");
 const Role = require("../models/role.model");
 const ExcelJS = require("exceljs");
+const mongoose = require("mongoose");
 
 class TicketService {
   /**
@@ -20,16 +21,13 @@ class TicketService {
    * @param {String} userRole - Role of the user making the request
    * @returns {Promise<Object>} - Paginated tickets data
    */
-  /**
-   * Get all tickets with pagination and filtering
-   * @param {Object} query - Query parameters for filtering tickets
-   * @param {Object} options - Pagination and sorting options
-   * @param {String} userId - ID of the user making the request
-   * @param {String} userRole - Role of the user making the request
-   * @returns {Promise<Object>} - Paginated tickets data
-   */
   static async getAllTickets(query, options, userId, userRole) {
     let queryObject = { ...query };
+
+    if (queryObject.problem) {
+      queryObject.problems = queryObject.problem;
+      delete queryObject.problem;
+    }
 
     if (userRole === ROLES.ENGINEER && !queryObject.assignedTo) {
       queryObject = {
@@ -66,6 +64,7 @@ class TicketService {
             path: "createdBy",
           },
         },
+        { path: "problems", select: "name category" },
       ],
     };
 
@@ -227,6 +226,17 @@ class TicketService {
 
     // Update customer's ticket count and references
     await customer.addTicket(ticket._id);
+
+    // Update ticket count for each problem
+    if (ticketData.problems && ticketData.problems.length > 0) {
+      const Problem = mongoose.model("Problem");
+      for (const problemId of ticketData.problems) {
+        const problem = await Problem.findById(problemId);
+        if (problem) {
+          await problem.updateTicketCount();
+        }
+      }
+    }
 
     // Process attachments if any
     if (formData.files && formData.files.length > 0) {
@@ -413,28 +423,22 @@ class TicketService {
 
     // Process problems array - might be JSON string in FormData
     if (updateData.problems) {
-      try {
-        // If it's a string (from FormData), parse it
-        if (typeof updateData.problems === "string") {
-          cleanUpdate.problems = JSON.parse(updateData.problems);
-        } else {
-          cleanUpdate.problems = updateData.problems;
-        }
-
-        // Track changes to problems if different
-        if (
-          JSON.stringify(ticket.problems) !==
-          JSON.stringify(cleanUpdate.problems)
-        ) {
-          fieldChanges.push({
-            field: "problems",
-            oldValue: ticket.problems || [],
-            newValue: cleanUpdate.problems,
-          });
-        }
-      } catch (e) {
-        console.error("Error parsing problems array:", e);
+      if (typeof updateData.problems === "string") {
+        cleanUpdate.problems = JSON.parse(updateData.problems);
+      } else {
+        cleanUpdate.problems = updateData.problems;
       }
+    }
+
+    // Track changes to problems if different
+    if (
+      JSON.stringify(ticket.problems) !== JSON.stringify(cleanUpdate.problems)
+    ) {
+      fieldChanges.push({
+        field: "problems",
+        oldValue: ticket.problems || [],
+        newValue: cleanUpdate.problems,
+      });
     }
 
     // Process attachments to delete - might be JSON string in FormData
@@ -573,6 +577,33 @@ class TicketService {
 
     // Save the ticket
     await ticket.save();
+
+    // Update ticket count for problems if they were changed
+    if (fieldChanges.some((change) => change.field === "problems")) {
+      const Problem = mongoose.model("Problem");
+      const oldProblems = oldTicket.problems || [];
+      const newProblems = cleanUpdate.problems || [];
+
+      // Update count for removed problems
+      for (const problemId of oldProblems) {
+        if (!newProblems.includes(problemId)) {
+          const problem = await Problem.findById(problemId);
+          if (problem) {
+            await problem.updateTicketCount();
+          }
+        }
+      }
+
+      // Update count for added problems
+      for (const problemId of newProblems) {
+        if (!oldProblems.includes(problemId)) {
+          const problem = await Problem.findById(problemId);
+          if (problem) {
+            await problem.updateTicketCount();
+          }
+        }
+      }
+    }
 
     // Send notifications on status change if needed
     if (statusChanged) {

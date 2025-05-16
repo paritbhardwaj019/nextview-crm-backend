@@ -265,6 +265,12 @@ const ticketSchema = new mongoose.Schema(
         ],
       },
     ],
+    problems: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Problem",
+      },
+    ],
   },
   { timestamps: true }
 );
@@ -374,6 +380,17 @@ ticketSchema.pre("remove", async function (next) {
         $inc: { ticketCount: -1 },
       });
     }
+
+    // Update ticket count for problems
+    if (this.problems && this.problems.length > 0) {
+      const Problem = mongoose.model("Problem");
+      for (const problemId of this.problems) {
+        const problem = await Problem.findById(problemId);
+        if (problem) {
+          await problem.updateTicketCount();
+        }
+      }
+    }
     next();
   } catch (error) {
     next(error);
@@ -391,6 +408,7 @@ ticketSchema.index({ itemId: 1 });
 ticketSchema.index({ serialNumber: 1 });
 ticketSchema.index({ customerId: 1 });
 ticketSchema.index({ type: 1 });
+ticketSchema.index({ problems: 1 });
 
 ticketSchema.virtual("ageInDays").get(function () {
   return Math.ceil(

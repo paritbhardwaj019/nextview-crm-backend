@@ -30,16 +30,21 @@ class TicketController {
       sort = "-createdAt",
     } = req.query;
 
-    // Initialize query object for basic filters
     const query = {};
 
-    // Apply basic filters
     if (status) query.status = status;
     if (priority) query.priority = priority;
     if (category) query.category = category;
     if (assignedTo) query.assignedTo = assignedTo;
     if (itemId) query.itemId = itemId;
     if (type) query.type = type;
+
+    console.log(
+      "REQ.QUERY.PROBLEM @ticket.controller.js L36",
+      req.query.problem
+    );
+
+    if (req.query.problem) query.problem = { $in: [req.query.problem] };
 
     if (req.user.role === "ENGINEER") {
       query.assignedTo = req.user.id;
@@ -66,11 +71,9 @@ class TicketController {
         customerIds = matchingCustomers.map((customer) => customer._id);
       }
 
-      // Build search query
       const searchConditions = [];
 
       if (serialNumber) {
-        // Add explicit serial number condition
         query.serialNumber = { $regex: serialNumber, $options: "i" };
       } else if (search) {
         searchConditions.push(
