@@ -62,7 +62,9 @@ class TicketService {
         ...(options.populate || []),
         {
           path: "customerId",
-          select: "name email mobile address city state pincode",
+          populate: {
+            path: "createdBy",
+          },
         },
       ],
     };
@@ -98,26 +100,6 @@ class TicketService {
       userRole,
       ticket
     );
-
-    if (userRole === ROLES.ENGINEER) {
-      if (ticket.assignedTo?.toString() !== userId?.toString()) {
-        throw ApiError.forbidden(
-          "You do not have permission to view this ticket"
-        );
-      }
-    } else if (userRole === ROLES.SUPPORT_MANAGER) {
-      const engineersUnderManager = await User.find({
-        role: ROLES.ENGINEER,
-      }).select("_id");
-
-      const engineerIds = engineersUnderManager.map((e) => e._id.toString());
-
-      if (ticket.assignedTo?.toString() !== userId?.toString()) {
-        throw ApiError.forbidden(
-          "You do not have permission to view this ticket"
-        );
-      }
-    }
 
     return ticket;
   }
@@ -357,26 +339,6 @@ class TicketService {
       userRole,
       ticket
     );
-
-    if (userRole === ROLES.ENGINEER) {
-      if (ticket.assignedTo?._id?.toString() !== userId?.toString()) {
-        throw ApiError.forbidden(
-          "You do not have permission to view this ticket"
-        );
-      }
-    } else if (userRole === ROLES.SUPPORT_MANAGER) {
-      const engineersUnderManager = await User.find({
-        role: ROLES.ENGINEER,
-      }).select("_id");
-
-      const engineerIds = engineersUnderManager.map((e) => e._id.toString());
-
-      if (ticket.assignedTo?._id?.toString() !== userId?.toString()) {
-        throw ApiError.forbidden(
-          "You do not have permission to view this ticket"
-        );
-      }
-    }
 
     return ticket;
   }

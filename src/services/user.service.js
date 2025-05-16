@@ -11,12 +11,8 @@ class UserService {
    * @param {String} requestingUserRole - Role of the user making the request
    * @returns {Promise<Object>} - Paginated users data
    */
-  static async getAllUsers(query, options, requestingUserRole) {
+  static async getAllUsers(query, options) {
     const queryObject = { ...query };
-
-    if (requestingUserRole === ROLES.SUPPORT_MANAGER) {
-      queryObject.role = ROLES.ENGINEER;
-    }
 
     return await User.paginate(queryObject, options);
   }
@@ -24,11 +20,9 @@ class UserService {
   /**
    * Get user by ID
    * @param {String} id - User ID
-   * @param {String} requestingUserId - ID of the user making the request
-   * @param {String} requestingUserRole - Role of the user making the request
    * @returns {Promise<Object>} - User data
    */
-  static async getUserById(id, requestingUserId, requestingUserRole) {
+  static async getUserById(id) {
     const user = await User.findById(id).select("-password").populate({
       path: "createdBy",
       select: "name email",
@@ -36,24 +30,6 @@ class UserService {
 
     if (!user) {
       throw ApiError.notFound("User not found");
-    }
-
-    if (
-      requestingUserRole !== ROLES.SUPER_ADMIN &&
-      requestingUserRole !== ROLES.SUPPORT_MANAGER &&
-      requestingUserId !== id
-    ) {
-      throw ApiError.forbidden("Insufficient permissions to view this user");
-    }
-
-    if (
-      requestingUserRole === ROLES.SUPPORT_MANAGER &&
-      user.role !== ROLES.ENGINEER &&
-      requestingUserId !== id
-    ) {
-      throw ApiError.forbidden(
-        "Support Managers can only view engineers or themselves"
-      );
     }
 
     return user;
@@ -68,12 +44,6 @@ class UserService {
    */
   static async createUser(userData, createdBy, creatorRole) {
     const { email, name, role, password } = userData;
-
-    if (creatorRole === ROLES.SUPPORT_MANAGER && role !== ROLES.ENGINEER) {
-      throw ApiError.forbidden(
-        "Support Managers can only create Engineer accounts"
-      );
-    }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -125,24 +95,6 @@ class UserService {
       throw ApiError.notFound("User not found");
     }
 
-    if (
-      requestingUserRole === ROLES.SUPPORT_MANAGER &&
-      user.role !== ROLES.ENGINEER
-    ) {
-      throw ApiError.forbidden(
-        "Support Managers can only update Engineer accounts"
-      );
-    }
-
-    if (
-      !isRoleAuthorized(requestingUserRole, user.role) &&
-      id !== requestingUserId
-    ) {
-      throw ApiError.forbidden(
-        "You do not have permission to update this user"
-      );
-    }
-
     Object.keys(updateData).forEach((key) => {
       user[key] = updateData[key];
     });
@@ -175,21 +127,6 @@ class UserService {
       throw ApiError.notFound("User not found");
     }
 
-    if (
-      requestingUserRole === ROLES.SUPPORT_MANAGER &&
-      user.role !== ROLES.ENGINEER
-    ) {
-      throw ApiError.forbidden(
-        "Support Managers can only modify Engineer account status"
-      );
-    }
-
-    if (!isRoleAuthorized(requestingUserRole, user.role)) {
-      throw ApiError.forbidden(
-        "You do not have permission to modify this user"
-      );
-    }
-
     user.isActive = isActive;
     await user.save();
 
@@ -206,15 +143,6 @@ class UserService {
     const user = await User.findById(id);
     if (!user) {
       throw ApiError.notFound("User not found");
-    }
-
-    if (
-      requestingUserRole === ROLES.SUPPORT_MANAGER &&
-      user.role !== ROLES.ENGINEER
-    ) {
-      throw ApiError.forbidden(
-        "Support Managers can only reset passwords for Engineer accounts"
-      );
     }
 
     user.password = data.password;
@@ -241,26 +169,6 @@ class UserService {
     const user = await User.findById(userId);
     if (!user) {
       throw ApiError.notFound("User not found");
-    }
-
-    // Role-based access control - users can view their own preferences
-    if (
-      requestingUserRole !== ROLES.SUPER_ADMIN &&
-      requestingUserRole !== ROLES.SUPPORT_MANAGER &&
-      requestingUserId !== userId
-    ) {
-      throw ApiError.forbidden("Insufficient permissions");
-    }
-
-    // Support managers can only view engineers and themselves
-    if (
-      requestingUserRole === ROLES.SUPPORT_MANAGER &&
-      user.role !== ROLES.ENGINEER &&
-      requestingUserId !== userId
-    ) {
-      throw ApiError.forbidden(
-        "Support Managers can only view preferences for Engineers or themselves"
-      );
     }
 
     // Get preferences
