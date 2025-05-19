@@ -246,13 +246,6 @@ class ItemService {
       );
     }
 
-    // For inward transactions, validate reference
-    if (type === "INWARD" && !reference) {
-      throw ApiError.badRequest(
-        "Reference is required for inward transactions"
-      );
-    }
-
     const item = await this.getItemById(id);
 
     // Find the inventory entry for this condition
