@@ -14,6 +14,22 @@ class UserService {
   static async getAllUsers(query, options) {
     const queryObject = { ...query };
 
+    // Handle search across multiple fields
+    if (queryObject.search) {
+      queryObject.$or = [
+        { name: { $regex: queryObject.search, $options: "i" } },
+        { email: { $regex: queryObject.search, $options: "i" } },
+        { mobileNumber: { $regex: queryObject.search, $options: "i" } },
+        { location: { $regex: queryObject.search, $options: "i" } },
+      ];
+      delete queryObject.search;
+    }
+
+    // Handle location filter
+    if (queryObject.location) {
+      queryObject.location = { $regex: queryObject.location, $options: "i" };
+    }
+
     return await User.paginate(queryObject, options);
   }
 
@@ -43,7 +59,16 @@ class UserService {
    * @returns {Promise<Object>} - Created user data
    */
   static async createUser(userData, createdBy, creatorRole) {
-    const { email, name, role, password } = userData;
+    const {
+      email,
+      name,
+      role,
+      password,
+      mobileNumber,
+      address,
+      location,
+      remark,
+    } = userData;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -60,6 +85,10 @@ class UserService {
       role,
       password,
       createdBy,
+      mobileNumber,
+      address,
+      location,
+      remark,
     });
 
     await NotificationPreference.create({
@@ -95,10 +124,24 @@ class UserService {
       throw ApiError.notFound("User not found");
     }
 
-    Object.keys(updateData).forEach((key) => {
-      user[key] = updateData[key];
-    });
+    // Only allow updating specific fields
+    const allowedFields = [
+      "name",
+      "email",
+      "role",
+      "mobileNumber",
+      "address",
+      "location",
+      "remark",
+    ];
+    const filteredUpdateData = Object.keys(updateData)
+      .filter((key) => allowedFields.includes(key))
+      .reduce((obj, key) => {
+        obj[key] = updateData[key];
+        return obj;
+      }, {});
 
+    Object.assign(user, filteredUpdateData);
     await user.save();
 
     return user;

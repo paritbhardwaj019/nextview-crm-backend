@@ -239,7 +239,6 @@ class ItemService {
       throw ApiError.badRequest("Transaction quantity must be positive");
     }
 
-    // For outward transactions, validate ticket
     if (type === "OUTWARD" && !ticketId) {
       throw ApiError.badRequest(
         "Ticket ID is required for outward transactions"
@@ -248,7 +247,6 @@ class ItemService {
 
     const item = await this.getItemById(id);
 
-    // Find the inventory entry for this condition
     let inventoryEntry = item.inventory.find(
       (stock) => stock.condition === condition
     );

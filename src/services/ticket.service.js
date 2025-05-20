@@ -29,6 +29,11 @@ class TicketService {
       delete queryObject.problem;
     }
 
+    // Handle type filter
+    if (queryObject.type) {
+      queryObject.type = queryObject.type.toUpperCase();
+    }
+
     if (userRole === ROLES.ENGINEER && !queryObject.assignedTo) {
       queryObject = {
         ...queryObject,
@@ -337,7 +342,10 @@ class TicketService {
       .populate("closedBy", "name email role")
       .populate("comments.createdBy", "name email role")
       .populate("attachments.uploadedBy", "name email role")
-      .populate("customerId", "name mobile email address city state pincode"); // Add customer population
+      .populate(
+        "customerId",
+        "name mobile email address city state pincode village"
+      ); // Add customer population
 
     if (!ticket) {
       throw ApiError.notFound("Ticket not found");
@@ -1314,7 +1322,10 @@ class TicketService {
     const tickets = await Ticket.find(query)
       .populate("createdBy", "name email")
       .populate("assignedTo", "name email")
-      .populate("customerId", "name email mobile")
+      .populate(
+        "customerId",
+        "name email mobile address city state pincode village"
+      )
       .populate("itemId", "name category sku")
       .sort({ createdAt: -1 });
 
@@ -1326,6 +1337,9 @@ class TicketService {
     worksheet.columns = [
       { header: "TICKET ID", key: "ticketId", width: 15 },
       { header: "CUSTOMER", key: "customer", width: 30 },
+      { header: "CUSTOMER ADDRESS", key: "customerAddress", width: 40 },
+      { header: "CUSTOMER MOBILE", key: "customerMobile", width: 18 },
+      { header: "CUSTOMER EMAIL", key: "customerEmail", width: 30 },
       { header: "ITEM", key: "item", width: 30 },
       { header: "SERIAL NUMBER", key: "serialNumber", width: 20 },
       { header: "STATUS", key: "status", width: 15 },
@@ -1345,9 +1359,24 @@ class TicketService {
 
     // Add data rows
     tickets.forEach((ticket) => {
+      let customerAddress = "";
+      if (ticket.customerId) {
+        const c = ticket.customerId;
+        const addressParts = [
+          c.address,
+          c.city,
+          c.state,
+          c.pincode,
+          c.village,
+        ].filter(Boolean);
+        customerAddress = addressParts.join(", ");
+      }
       worksheet.addRow({
         ticketId: ticket.ticketId || ticket._id.toString().substring(0, 8),
         customer: ticket.customerId ? ticket.customerId.name : "—",
+        customerAddress,
+        customerMobile: ticket.customerId ? ticket.customerId.mobile : "—",
+        customerEmail: ticket.customerId ? ticket.customerId.email : "—",
         item: ticket.itemId ? ticket.itemId.name : ticket.modelNumber || "—",
         serialNumber: ticket.serialNumber || "—",
         status: ticket.status.replace(/_/g, " "),

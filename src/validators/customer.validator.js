@@ -49,6 +49,15 @@ const customerSchema = Joi.object({
   }),
   isActive: Joi.boolean().default(true),
   source: Joi.string().valid("manual", "imported").default("manual"),
+  alternateMobile: Joi.string()
+    .allow("")
+    .pattern(/^\d{10}$/)
+    .messages({
+      "string.pattern.base": "Alternate mobile must be a 10-digit number",
+    }),
+  alternatePersonName: Joi.string().allow("").max(100).messages({
+    "string.max": "Alternate person name cannot exceed 100 characters",
+  }),
 });
 
 /**
@@ -86,6 +95,15 @@ const customerUpdateSchema = Joi.object({
   }),
   isActive: Joi.boolean(),
   source: Joi.string().valid("manual", "imported"),
+  alternateMobile: Joi.string()
+    .allow("")
+    .pattern(/^\d{10}$/)
+    .messages({
+      "string.pattern.base": "Alternate mobile must be a 10-digit number",
+    }),
+  alternatePersonName: Joi.string().allow("").max(100).messages({
+    "string.max": "Alternate person name cannot exceed 100 characters",
+  }),
 });
 
 module.exports = {

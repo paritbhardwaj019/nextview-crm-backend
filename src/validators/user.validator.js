@@ -25,6 +25,20 @@ const createUserSchema = Joi.object({
     "any.required": "Password is required",
     "string.min": "Password must be at least 8 characters long",
   }),
+  mobileNumber: Joi.string()
+    .pattern(/^\d{10}$/)
+    .messages({
+      "string.pattern.base": "Mobile number must be a 10-digit number",
+    }),
+  address: Joi.string().max(500).messages({
+    "string.max": "Address cannot exceed 500 characters",
+  }),
+  location: Joi.string().max(100).messages({
+    "string.max": "Location cannot exceed 100 characters",
+  }),
+  remark: Joi.string().max(1000).messages({
+    "string.max": "Remark cannot exceed 1000 characters",
+  }),
 });
 
 /**
@@ -34,6 +48,20 @@ const updateUserSchema = Joi.object({
   name: Joi.string().min(2).max(100).messages({
     "string.min": "Name must be at least 2 characters long",
     "string.max": "Name cannot exceed 100 characters",
+  }),
+  mobileNumber: Joi.string()
+    .pattern(/^\d{10}$/)
+    .messages({
+      "string.pattern.base": "Mobile number must be a 10-digit number",
+    }),
+  address: Joi.string().max(500).messages({
+    "string.max": "Address cannot exceed 500 characters",
+  }),
+  location: Joi.string().max(100).messages({
+    "string.max": "Location cannot exceed 100 characters",
+  }),
+  remark: Joi.string().max(1000).messages({
+    "string.max": "Remark cannot exceed 1000 characters",
   }),
   isActive: Joi.boolean().messages({
     "boolean.base": "isActive must be a boolean",

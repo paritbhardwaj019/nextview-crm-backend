@@ -59,6 +59,12 @@ const mongoose = require("mongoose");
  *           type: string
  *           format: date-time
  *           description: Timestamp when customer was last updated
+ *         alternateMobile:
+ *           type: string
+ *           description: Alternate mobile phone number
+ *         alternatePersonName:
+ *           type: string
+ *           description: Alternate contact person name
  */
 const customerSchema = new mongoose.Schema(
   {
@@ -137,6 +143,20 @@ const customerSchema = new mongoose.Schema(
         ref: "Ticket",
       },
     ],
+    alternateMobile: {
+      type: String,
+      trim: true,
+      validate: {
+        validator: function (v) {
+          return !v || /^\d{10}$/.test(v);
+        },
+        message: (props) => `${props.value} is not a valid mobile number!`,
+      },
+    },
+    alternatePersonName: {
+      type: String,
+      trim: true,
+    },
   },
   { timestamps: true }
 );

@@ -31,6 +31,18 @@ const bcrypt = require("bcryptjs");
  *         name:
  *           type: string
  *           description: Full name of the user
+ *         mobileNumber:
+ *           type: string
+ *           description: Mobile number of the user
+ *         address:
+ *           type: string
+ *           description: Full address of the user
+ *         location:
+ *           type: string
+ *           description: Location/area of the user
+ *         remark:
+ *           type: string
+ *           description: Additional remarks about the user
  *         createdBy:
  *           type: string
  *           description: User ID who created this user
@@ -70,6 +82,22 @@ const userSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
+      trim: true,
+    },
+    mobileNumber: {
+      type: String,
+      trim: true,
+    },
+    address: {
+      type: String,
+      trim: true,
+    },
+    location: {
+      type: String,
+      trim: true,
+    },
+    remark: {
+      type: String,
       trim: true,
     },
     createdBy: {

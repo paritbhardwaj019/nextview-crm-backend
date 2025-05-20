@@ -12,20 +12,32 @@ class UserController {
    * Access: SUPER_ADMIN, SUPPORT_MANAGER
    */
   static getAllUsers = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, role, search, isActive } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      role,
+      search,
+      isActive,
+      location,
+    } = req.query;
     const userRole = req.user.role;
 
     const query = {};
 
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } },
-      ];
+      query.search = search;
+    }
+
+    if (location) {
+      query.location = location;
     }
 
     if (isActive !== undefined) {
       query.isActive = isActive === "true";
+    }
+
+    if (role) {
+      query.role = role;
     }
 
     const options = {
@@ -40,6 +52,8 @@ class UserController {
     };
 
     const users = await UserService.getAllUsers(query, options, userRole);
+
+    console.log("USERS @user.controller.js LINE 44", users);
 
     await ActivityLogService.logActivity({
       userId: req.user.id,
@@ -82,12 +96,21 @@ class UserController {
    * Access: SUPER_ADMIN can create any role, SUPPORT_MANAGER can only create ENGINEER
    */
   static createUser = asyncHandler(async (req, res) => {
-    const { email, name, role, password } = req.body;
+    const {
+      email,
+      name,
+      role,
+      password,
+      mobileNumber,
+      address,
+      location,
+      remark,
+    } = req.body;
     const userRole = req.user.role;
     const userId = req.user.id;
 
     const result = await UserService.createUser(
-      { email, name, role, password },
+      { email, name, role, password, mobileNumber, address, location, remark },
       userId,
       userRole
     );
@@ -111,6 +134,10 @@ class UserController {
       name: result.user.name,
       role: result.user.role,
       isActive: result.user.isActive,
+      mobileNumber: result.user.mobileNumber,
+      address: result.user.address,
+      location: result.user.location,
+      remark: result.user.remark,
       createdAt: result.user.createdAt,
     });
   });
@@ -127,7 +154,6 @@ class UserController {
 
     const user = await UserService.updateUser(id, updateData, userId, userRole);
 
-    // Log activity
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "USER_UPDATED",
@@ -141,6 +167,10 @@ class UserController {
       name: user.name,
       role: user.role,
       isActive: user.isActive,
+      mobileNumber: user.mobileNumber,
+      address: user.address,
+      location: user.location,
+      remark: user.remark,
       updatedAt: user.updatedAt,
     });
   });

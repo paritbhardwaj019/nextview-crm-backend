@@ -80,6 +80,8 @@ class CustomerService {
       ...customerData,
       createdBy: userId,
       source: customerData.source || "manual",
+      alternateMobile: customerData.alternateMobile,
+      alternatePersonName: customerData.alternatePersonName,
     });
 
     return customer;
@@ -120,6 +122,12 @@ class CustomerService {
     Object.keys(updateData).forEach((key) => {
       customer[key] = updateData[key];
     });
+
+    // Ensure alternate fields are updated if present
+    if (updateData.alternateMobile !== undefined)
+      customer.alternateMobile = updateData.alternateMobile;
+    if (updateData.alternatePersonName !== undefined)
+      customer.alternatePersonName = updateData.alternatePersonName;
 
     await customer.save();
 

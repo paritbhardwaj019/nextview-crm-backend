@@ -19,6 +19,21 @@ const createTicketSchema = Joi.object({
     .messages({
       "any.only": "Priority must be one of: LOW, MEDIUM, HIGH, CRITICAL",
     }),
+  type: Joi.string()
+    .valid(
+      "SERVICE",
+      "INSTALLATION",
+      "CHARGEABLE",
+      "IN_WARRANTY",
+      "OUT_OF_WARRANTY",
+      "COMPLAINT",
+      "DISPATCH"
+    )
+    .default("SERVICE")
+    .messages({
+      "any.only":
+        "Type must be one of: SERVICE, INSTALLATION, CHARGEABLE, IN_WARRANTY, OUT_OF_WARRANTY, COMPLAINT, DISPATCH",
+    }),
   category: Joi.string()
     .valid("HARDWARE", "SOFTWARE", "NETWORK", "ACCOUNT", "OTHER")
     .default("OTHER")
@@ -91,6 +106,20 @@ const updateTicketSchema = Joi.object({
   priority: Joi.string().valid("LOW", "MEDIUM", "HIGH", "CRITICAL").messages({
     "any.only": "Priority must be one of: LOW, MEDIUM, HIGH, CRITICAL",
   }),
+  type: Joi.string()
+    .valid(
+      "SERVICE",
+      "INSTALLATION",
+      "CHARGEABLE",
+      "IN_WARRANTY",
+      "OUT_OF_WARRANTY",
+      "COMPLAINT",
+      "DISPATCH"
+    )
+    .messages({
+      "any.only":
+        "Type must be one of: SERVICE, INSTALLATION, CHARGEABLE, IN_WARRANTY, OUT_OF_WARRANTY, COMPLAINT, DISPATCH",
+    }),
   category: Joi.string()
     .valid("HARDWARE", "SOFTWARE", "NETWORK", "ACCOUNT", "OTHER")
     .messages({
