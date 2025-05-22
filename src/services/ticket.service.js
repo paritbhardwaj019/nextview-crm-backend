@@ -927,6 +927,14 @@ class TicketService {
       throw ApiError.forbidden("You do not have permission to assign tickets");
     }
 
+    // Check if the user being assigned to has the necessary permissions
+    const assignToUserRole = await Role.findOne({ code: assignToUser.role });
+    if (!assignToUserRole.permissions.includes(PERMISSIONS.VIEW_TICKET)) {
+      throw ApiError.forbidden(
+        "Selected user does not have permission to view tickets"
+      );
+    }
+
     const assignmentRecord = {
       assignedTo: assignToUserId,
       assignedBy: assignedByUserId,
@@ -1410,6 +1418,44 @@ class TicketService {
 
     // Generate buffer
     return await workbook.xlsx.writeBuffer();
+  }
+
+  /**
+   * Delete a ticket
+   * @param {String} id - Ticket ID
+   * @param {String} userId - ID of the user making the request
+   * @param {String} userRole - Role of the user making the request
+   * @param {String} reason - Reason for deletion
+   * @returns {Promise<Object>} - Deleted ticket data
+   */
+  static async deleteTicket(id, userId, userRole, reason) {
+    const ticket = await Ticket.findById(id);
+    if (!ticket) {
+      throw ApiError.notFound("Ticket not found");
+    }
+
+    ticket.history.push({
+      action: "DELETED",
+      performedBy: userId,
+      timestamp: new Date(),
+      comment: `Ticket deleted. Reason: ${reason}`,
+    });
+
+    await ticket.save();
+
+    const customerId = ticket.customerId;
+
+    await ticket.deleteOne();
+
+    if (customerId) {
+      const Customer = mongoose.model("Customer");
+      const customer = await Customer.findById(customerId);
+      if (customer) {
+        await customer.updateTicketCount();
+      }
+    }
+
+    return ticket;
   }
 }
 

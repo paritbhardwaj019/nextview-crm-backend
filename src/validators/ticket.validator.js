@@ -35,11 +35,18 @@ const createTicketSchema = Joi.object({
         "Type must be one of: SERVICE, INSTALLATION, CHARGEABLE, IN_WARRANTY, OUT_OF_WARRANTY, COMPLAINT, DISPATCH",
     }),
   category: Joi.string()
-    .valid("HARDWARE", "SOFTWARE", "NETWORK", "ACCOUNT", "OTHER")
+    .valid(
+      "MOTHERBOARD",
+      "REMOTE",
+      "PANEL",
+      "SOFTWARE",
+      "TROUBLESHOOT",
+      "OTHER"
+    )
     .default("OTHER")
     .messages({
       "any.only":
-        "Category must be one of: HARDWARE, SOFTWARE, NETWORK, ACCOUNT, OTHER",
+        "Category must be one of: MOTHERBOARD, REMOTE, PANEL, SOFTWARE, TROUBLESHOOT, OTHER",
     }),
   itemId: Joi.string().allow(null, ""),
   serialNumber: Joi.string().when("itemId", {
@@ -121,10 +128,17 @@ const updateTicketSchema = Joi.object({
         "Type must be one of: SERVICE, INSTALLATION, CHARGEABLE, IN_WARRANTY, OUT_OF_WARRANTY, COMPLAINT, DISPATCH",
     }),
   category: Joi.string()
-    .valid("HARDWARE", "SOFTWARE", "NETWORK", "ACCOUNT", "OTHER")
+    .valid(
+      "MOTHERBOARD",
+      "REMOTE",
+      "PANEL",
+      "SOFTWARE",
+      "TROUBLESHOOT",
+      "OTHER"
+    )
     .messages({
       "any.only":
-        "Category must be one of: HARDWARE, SOFTWARE, NETWORK, ACCOUNT, OTHER",
+        "Category must be one of: MOTHERBOARD, REMOTE, PANEL, SOFTWARE, TROUBLESHOOT, OTHER",
     }),
   itemId: Joi.string().allow(null, ""),
   serialNumber: Joi.string().when("itemId", {
@@ -173,11 +187,17 @@ const updateTicketSchema = Joi.object({
  * Schema for assigning a ticket
  */
 const assignTicketSchema = Joi.object({
-  assignToUserId: Joi.string().required().messages({
-    "string.empty": "User ID to assign the ticket to is required",
-    "any.required": "User ID to assign the ticket to is required",
+  assignToUserId: Joi.string()
+    .required()
+    .pattern(/^[0-9a-fA-F]{24}$/)
+    .messages({
+      "string.empty": "User ID to assign the ticket to is required",
+      "string.pattern.base": "Invalid user ID format",
+      "any.required": "User ID to assign the ticket to is required",
+    }),
+  notes: Joi.string().max(500).allow("", null).messages({
+    "string.max": "Notes cannot exceed 500 characters",
   }),
-  notes: Joi.string().allow("", null),
 }).unknown(true); // Allow unknown fields
 
 /**
@@ -324,6 +344,18 @@ const inventoryTransactionSchema = Joi.object({
   docketNumber: Joi.string().allow("", null),
 }).unknown(true);
 
+/**
+ * Schema for deleting a ticket
+ */
+const deleteTicketSchema = Joi.object({
+  reason: Joi.string().required().min(10).max(500).messages({
+    "string.empty": "Reason for deletion is required",
+    "string.min": "Reason must be at least 10 characters long",
+    "string.max": "Reason cannot exceed 500 characters",
+    "any.required": "Reason for deletion is required",
+  }),
+}).unknown(true);
+
 module.exports = {
   createTicketSchema,
   updateTicketSchema,
@@ -333,4 +365,5 @@ module.exports = {
   formatFileUploads,
   processFileUploads,
   inventoryTransactionSchema,
+  deleteTicketSchema,
 };

@@ -23,7 +23,14 @@ const ticketSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      enum: ["HARDWARE", "SOFTWARE", "NETWORK", "ACCOUNT", "OTHER"],
+      enum: [
+        "MOTHERBOARD",
+        "REMOTE",
+        "PANEL",
+        "SOFTWARE",
+        "TROUBLESHOOT",
+        "OTHER",
+      ],
       default: "OTHER",
     },
     status: {
@@ -236,6 +243,7 @@ const ticketSchema = new mongoose.Schema(
             "COMMENT_ADDED",
             "ATTACHMENT_ADDED",
             "ATTACHMENT_REMOVED",
+            "DELETED",
           ],
           required: true,
         },

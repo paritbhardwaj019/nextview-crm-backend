@@ -148,14 +148,16 @@ class CustomerService {
       customerId: id,
     });
 
-    if (ticketsCount > 0 || installationRequestsCount > 0) {
-      // Don't actually delete, just deactivate
-      customer.isActive = false;
-      await customer.save();
-      return {
-        success: true,
-        message: "Customer deactivated (has associated records)",
-      };
+    if (ticketsCount > 0) {
+      throw ApiError.conflict(
+        `Cannot delete customer. Customer has ${ticketsCount} associated ticket(s). Please delete the tickets first.`
+      );
+    }
+
+    if (installationRequestsCount > 0) {
+      throw ApiError.conflict(
+        `Cannot delete customer. Customer has ${installationRequestsCount} associated installation request(s). Please delete the installation requests first.`
+      );
     }
 
     // If no associated records, truly delete

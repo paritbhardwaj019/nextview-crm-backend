@@ -6,6 +6,7 @@ const asyncHandler = require("../utils/asyncHandler.util");
 const Ticket = require("../models/ticket.model");
 const Customer = require("../models/customer.model");
 const { ROLES } = require("../config/roles");
+const User = require("../models/user.model");
 
 class TicketController {
   /**
@@ -276,6 +277,16 @@ class TicketController {
       throw ApiError.badRequest("User ID to assign the ticket to is required");
     }
 
+    // Validate that the user being assigned to exists and is active
+    const assignToUser = await User.findById(assignToUserId);
+    if (!assignToUser) {
+      throw ApiError.notFound("User to assign ticket to not found");
+    }
+
+    if (!assignToUser.isActive) {
+      throw ApiError.badRequest("Cannot assign ticket to inactive user");
+    }
+
     const ticket = await TicketService.assignTicket(
       id,
       assignToUserId,
@@ -287,7 +298,7 @@ class TicketController {
     await ActivityLogService.logActivity({
       userId: req.user.id,
       action: "TICKET_ASSIGNED",
-      details: `Assigned ticket: ${ticket.ticketId || id} to user ID: ${assignToUserId}`,
+      details: `Assigned ticket: ${ticket.ticketId || id} to user: ${assignToUser.name} (${assignToUser.email})`,
       ipAddress: req.ip,
     });
 
@@ -648,6 +659,32 @@ class TicketController {
       next(new ApiError(error.message, error.statusCode));
     }
   }
+
+  /**
+   * Delete a ticket
+   * @route DELETE /api/tickets/:id
+   * @access Private
+   */
+  static deleteTicket = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const ticket = await TicketService.deleteTicket(
+      id,
+      req.user.id,
+      req.user.role,
+      reason
+    );
+
+    await ActivityLogService.logActivity({
+      userId: req.user.id,
+      action: "TICKET_DELETED",
+      details: `Deleted ticket: ${ticket.ticketId || id} - Reason: ${reason}`,
+      ipAddress: req.ip,
+    });
+
+    return ApiResponse.success(res, "Ticket deleted successfully", ticket);
+  });
 }
 
 module.exports = TicketController;

@@ -10,6 +10,7 @@ const {
   commentSchema,
   attachmentsSchema,
   processFileUploads,
+  deleteTicketSchema,
 } = require("../validators/ticket.validator");
 const {
   uploadTicketImage,
@@ -675,6 +676,55 @@ router.get(
   AuthMiddleware.authenticate,
   AuthMiddleware.requirePermission(PERMISSIONS.VIEW_TICKET),
   TicketController.getTicketHistory
+);
+
+/**
+ * @swagger
+ * /api/tickets/{id}:
+ *   delete:
+ *     summary: Delete a ticket
+ *     description: Delete a ticket with a required reason.
+ *     tags: [Tickets]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Ticket ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reason
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Reason for deleting the ticket
+ *     responses:
+ *       200:
+ *         description: Ticket deleted successfully
+ *       400:
+ *         description: Invalid input
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Ticket not found
+ */
+router.delete(
+  "/:id",
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requirePermission(PERMISSIONS.DELETE_TICKET),
+  auditMiddleware("Ticket"),
+  validateRequest(deleteTicketSchema),
+  TicketController.deleteTicket
 );
 
 module.exports = router;
