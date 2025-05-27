@@ -53,6 +53,9 @@ const config = {
     origin: process.env.CORS_ORIGIN,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   },
+  whatsapp: {
+    apiToken: process.env.WHATSAPP_API_TOKEN,
+  },
 };
 
 module.exports = config;

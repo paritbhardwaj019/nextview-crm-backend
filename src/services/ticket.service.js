@@ -11,6 +11,7 @@ const NotificationService = require("./notification.service");
 const Role = require("../models/role.model");
 const ExcelJS = require("exceljs");
 const mongoose = require("mongoose");
+const { sendWhatsAppMessage } = require("../utils/whatsapp.utils");
 
 class TicketService {
   /**
@@ -672,10 +673,6 @@ class TicketService {
    * @private
    */
   static checkUpdatePermissions(ticket, updateData, userId, userRole) {
-    console.log("TICKET @ticket.service.js", ticket);
-    console.log("USER_ROLE @ticket.service.js", userRole);
-    console.log("USER_ID @ticket.service.js", userId);
-
     if (userRole === ROLES.ENGINEER) {
       if (ticket.assignedTo?.toString() !== userId?.toString()) {
         throw ApiError.forbidden(
@@ -817,7 +814,6 @@ class TicketService {
       throw ApiError.badRequest("Files are required");
     }
 
-    // Require comment for the attachment
     if (!formData.comment) {
       throw ApiError.badRequest(
         "Comment explaining the attachments is required"
@@ -1015,26 +1011,10 @@ class TicketService {
       throw ApiError.notFound("Ticket not found");
     }
 
-    // Validate that ticket is in the correct state for approval
-    if (ticket.status !== "PENDING_APPROVAL") {
-      throw ApiError.badRequest(
-        "Only tickets in 'Pending Approval' status can be approved"
-      );
-    }
-
-    // Check role permissions
-    if (userRole !== ROLES.SUPER_ADMIN && userRole !== ROLES.SUPPORT_MANAGER) {
-      throw ApiError.forbidden(
-        "Only Super Admins and Support Managers can approve tickets"
-      );
-    }
-
-    // Update ticket status
     ticket.status = "RESOLVED";
     ticket.approvedBy = userId;
     ticket.approvedAt = new Date();
 
-    // Add history entry
     const historyEntry = {
       action: "STATUS_CHANGED",
       performedBy: userId,
@@ -1052,10 +1032,8 @@ class TicketService {
 
     ticket.history.push(historyEntry);
 
-    // Save ticket
     await ticket.save();
 
-    // Notify relevant parties
     await this.notifyTicketApproved(ticket, userId);
 
     return ticket;
@@ -1129,6 +1107,39 @@ class TicketService {
       message: `${actionUsername} has assigned you a ticket titled "${ticket.title}" with ${ticket.priority} priority. Please review and take necessary action.`,
       notificationType: "TICKET_ASSIGNED",
     });
+
+    try {
+      const customer = await Customer.findById(ticket.customerId);
+      if (!customer || !customer.mobile) return;
+
+      const dueDate = ticket.dueDate
+        ? new Date(ticket.dueDate).toLocaleDateString("en-GB")
+        : "Not set";
+
+      const location = [
+        ticket.type,
+        ticket.serialNumber,
+        `${customer.city}, ${customer.state} - ${customer.pincode}`,
+        customer.village || "",
+      ]
+        .filter(Boolean)
+        .join(" / ");
+
+      const customerInfo = `${customer.name} - ${customer.mobile}`;
+
+      await sendWhatsAppMessage({
+        mobileNo: assignedUser.mobileNumber,
+        countryCode: "+91",
+        templateName: "assign_ticket_template_3",
+        text1: ticket.ticketId || ticket._id.toString().slice(-6),
+        text2: assignedUser.name || "Not assigned",
+        text3: dueDate || "Not set",
+        text4: customerInfo || "No customer info",
+        text5: location,
+      });
+    } catch (error) {
+      console.error("Failed to send WhatsApp notification:", error);
+    }
   }
 
   /**
