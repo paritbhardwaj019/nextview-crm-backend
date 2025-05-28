@@ -93,7 +93,6 @@ class ItemService {
       warrantyInDays = 0,
     } = itemData;
 
-    // Check if SKU already exists (if provided)
     if (sku) {
       const existingItem = await Item.findOne({ sku });
       if (existingItem) {
@@ -101,17 +100,15 @@ class ItemService {
       }
     }
 
-    // Calculate total quantity from inventory
     const totalQuantity = inventory.reduce(
       (total, stock) => total + (stock.quantity || 0),
       0
     );
 
-    // Create the item with inventory details
     const item = await Item.create({
       ...itemData,
       quantity: totalQuantity,
-      warrantyInDays: Math.round(warrantyInDays), // Ensure warranty is stored as days
+      warrantyInDays: Math.round(warrantyInDays),
       inventory: inventory.map((stock) => ({
         ...stock,
         updatedBy: userId,
@@ -122,7 +119,6 @@ class ItemService {
       updatedBy: userId,
     });
 
-    // Record initial inventory transactions if any inventory is added
     if (inventory && inventory.length > 0) {
       const transactions = inventory
         .filter((stock) => stock.quantity > 0)

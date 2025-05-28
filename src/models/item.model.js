@@ -106,8 +106,6 @@ const itemSchema = new mongoose.Schema(
     },
     sku: {
       type: String,
-      unique: true,
-      sparse: true,
       trim: true,
     },
     status: {
@@ -124,7 +122,6 @@ const itemSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    // Track inventory transactions
     transactions: [inventoryTransactionSchema],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
