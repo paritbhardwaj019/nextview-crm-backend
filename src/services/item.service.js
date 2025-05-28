@@ -130,7 +130,7 @@ class ItemService {
           type: "INWARD",
           condition: stock.condition,
           quantity: stock.quantity,
-          reference: "Initial Stock",
+          reference: "OTHER",
           notes: "Initial inventory setup",
           performedBy: userId,
           performedAt: new Date(),
