@@ -24,6 +24,7 @@ const ticketSchema = new mongoose.Schema(
     category: {
       type: String,
       enum: [
+        "HARDWARE",
         "MOTHERBOARD",
         "REMOTE",
         "PANEL",
