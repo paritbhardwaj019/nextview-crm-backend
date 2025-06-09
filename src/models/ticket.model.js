@@ -30,6 +30,7 @@ const ticketSchema = new mongoose.Schema(
         "PANEL",
         "SOFTWARE",
         "TROUBLESHOOT",
+        "SPEAKER",
         "OTHER",
       ],
       default: "OTHER",
