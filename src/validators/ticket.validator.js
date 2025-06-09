@@ -36,18 +36,20 @@ const createTicketSchema = Joi.object({
     }),
   category: Joi.string()
     .valid(
+      "HARDWARE",
       "MOTHERBOARD",
       "REMOTE",
       "PANEL",
       "SOFTWARE",
       "TROUBLESHOOT",
       "SPEAKER",
+      "SIGNAGE",
       "OTHER"
     )
     .default("OTHER")
     .messages({
       "any.only":
-        "Category must be one of: MOTHERBOARD, REMOTE, PANEL, SOFTWARE, TROUBLESHOOT, SPEAKER, OTHER",
+        "Category must be one of: HARDWARE, MOTHERBOARD, REMOTE, PANEL, SOFTWARE, TROUBLESHOOT, SPEAKER, SIGNAGE, OTHER",
     }),
   itemId: Joi.string().allow(null, ""),
   serialNumber: Joi.string().when("itemId", {
@@ -130,17 +132,19 @@ const updateTicketSchema = Joi.object({
     }),
   category: Joi.string()
     .valid(
+      "HARDWARE",
       "MOTHERBOARD",
       "REMOTE",
       "PANEL",
       "SOFTWARE",
       "TROUBLESHOOT",
       "SPEAKER",
+      "SIGNAGE",
       "OTHER"
     )
     .messages({
       "any.only":
-        "Category must be one of: MOTHERBOARD, REMOTE, PANEL, SOFTWARE, TROUBLESHOOT, SPEAKER, OTHER",
+        "Category must be one of: HARDWARE, MOTHERBOARD, REMOTE, PANEL, SOFTWARE, TROUBLESHOOT, SPEAKER, SIGNAGE, OTHER",
     }),
   itemId: Joi.string().allow(null, ""),
   serialNumber: Joi.string().when("itemId", {
