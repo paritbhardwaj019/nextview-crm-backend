@@ -32,6 +32,7 @@ const ticketSchema = new mongoose.Schema(
         "TROUBLESHOOT",
         "SPEAKER",
         "SIGNAGE",
+        "BACKLIGHT",
         "OTHER",
       ],
       default: "OTHER",
