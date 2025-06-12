@@ -345,7 +345,7 @@ class TicketService {
       .populate("attachments.uploadedBy", "name email role")
       .populate(
         "customerId",
-        "name mobile email address city state pincode village"
+        "name mobile email address city state pincode village alternateMobile alternatePersonName"
       ); // Add customer population
 
     if (!ticket) {
